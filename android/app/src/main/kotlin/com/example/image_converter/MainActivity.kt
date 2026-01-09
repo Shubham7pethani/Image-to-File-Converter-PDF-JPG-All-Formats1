@@ -1,4 +1,4 @@
-package com.example.image_converter
+package com.sholo.imageconverter
 
 import android.content.Context
 import android.view.LayoutInflater

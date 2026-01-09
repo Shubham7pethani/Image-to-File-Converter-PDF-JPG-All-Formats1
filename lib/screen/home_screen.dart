@@ -21,11 +21,13 @@ class HomeScreen extends StatelessWidget {
           padding: const EdgeInsets.all(8.0),
           child: Image.asset('assets/onlylogo.png', fit: BoxFit.contain),
         ),
-        title: const Text(
-          'Image to File Converter – PDF, JPG & All Formats',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+        title: const FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(
+            'Image to File Converter',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+          ),
         ),
         actions: [
           IconButton(

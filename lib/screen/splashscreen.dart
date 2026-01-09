@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import '../services/update_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -12,8 +16,11 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen> {
   String? _version;
+  String? _patch;
   String? _error;
   bool _isLoading = true;
+
+  final UpdateService _updateService = UpdateService();
 
   static const Color _bgColor = Color(0xFF4B2C83);
 
@@ -31,7 +38,40 @@ class _SplashScreenState extends State<SplashScreen> {
 
     try {
       final info = await PackageInfo.fromPlatform();
-      _version = 'v${info.version}+${info.buildNumber}';
+      final versionLabel = 'v${info.version}+${info.buildNumber}';
+      final patchLabel = await _updateService.readCurrentPatchLabel();
+      if (!mounted) return;
+      setState(() {
+        _version = versionLabel;
+        _patch = patchLabel;
+      });
+
+      final decision = await _updateService.checkAndMaybeApplyUpdates(
+        platformIsAndroid:
+            !kIsWeb && defaultTargetPlatform == TargetPlatform.android,
+      );
+      if (!mounted) return;
+
+      if (decision.mustUpdateFromStore) {
+        final updated = await _tryInAppUpdateOrStore(info.packageName);
+        if (!mounted) return;
+        if (!updated) {
+          setState(() {
+            _isLoading = false;
+            _error = 'Update required to continue.';
+          });
+          return;
+        }
+      }
+
+      if (decision.shorebirdRestartRequired) {
+        await _showRestartRequiredDialog();
+        if (!mounted) return;
+        setState(() {
+          _isLoading = false;
+        });
+        return;
+      }
 
       final allowed = await _requestPermissions();
       if (!mounted) return;
@@ -52,6 +92,92 @@ class _SplashScreenState extends State<SplashScreen> {
         _error = 'Something went wrong. Please try again.';
       });
     }
+  }
+
+  Future<bool> _tryInAppUpdateOrStore(String packageName) async {
+    final isAndroid =
+        !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+
+    if (isAndroid) {
+      final ok = await _showForceUpdateDialog(
+        onUpdateNow: () async {
+          final started = await _updateService.performImmediateAndroidUpdate();
+          if (started) {
+            return;
+          }
+          await _openPlayStore(packageName);
+        },
+        onExit: () {
+          SystemNavigator.pop();
+        },
+      );
+
+      return ok;
+    }
+
+    return _openPlayStore(packageName);
+  }
+
+  Future<bool> _openPlayStore(String packageName) async {
+    final uri = Uri.parse(
+      'https://play.google.com/store/apps/details?id=$packageName',
+    );
+    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    return ok;
+  }
+
+  Future<bool> _showForceUpdateDialog({
+    required Future<void> Function() onUpdateNow,
+    required VoidCallback onExit,
+  }) async {
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Update Required'),
+          content: const Text(
+            'A newer version is available. Please update to continue.',
+          ),
+          actions: [
+            TextButton(onPressed: onExit, child: const Text('Exit')),
+            ElevatedButton(
+              onPressed: () async {
+                await onUpdateNow();
+                if (context.mounted) {
+                  Navigator.of(context).pop(true);
+                }
+              },
+              child: const Text('Update Now'),
+            ),
+          ],
+        );
+      },
+    );
+    return result ?? false;
+  }
+
+  Future<void> _showRestartRequiredDialog() async {
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Update Ready'),
+          content: const Text(
+            'A new update has been downloaded. Please restart the app to apply it.',
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () {
+                SystemNavigator.pop();
+              },
+              child: const Text('Restart'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Future<bool> _requestPermissions() async {
@@ -100,6 +226,18 @@ class _SplashScreenState extends State<SplashScreen> {
                       letterSpacing: 0.2,
                     ),
                   ),
+                if (_patch != null) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    _patch!,
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 18),
                 if (_isLoading)
                   const CircularProgressIndicator(
