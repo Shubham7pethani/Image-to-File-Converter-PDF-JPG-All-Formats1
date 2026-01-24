@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
@@ -9,11 +11,13 @@ import 'screen/report_bugs.dart';
 import 'screen/result_folder_screen.dart';
 import 'screen/single_image_screen.dart';
 import 'screen/settings_screen.dart';
+import 'screen/create_pdf_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await MobileAds.instance.initialize();
   runApp(const MyApp());
+
+  unawaited(MobileAds.instance.initialize());
 }
 
 class MyApp extends StatelessWidget {
@@ -24,7 +28,15 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Image to File Converter – PDF, JPG & All Formats',
+      builder: (context, child) {
+        return ColoredBox(
+          color: const Color(0xFF1B1E23),
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
       theme: ThemeData(
+        useMaterial3: false,
+        brightness: Brightness.dark,
         // This is the theme of your application.
         //
         // TRY THIS: Try running your application with "flutter run". You'll see
@@ -40,13 +52,25 @@ class MyApp extends StatelessWidget {
         //
         // This works for code too, not just values: Most code changes can be
         // tested with just a hot reload.
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF4B2C83)),
+        scaffoldBackgroundColor: const Color(0xFF1B1E23),
+        canvasColor: const Color(0xFF1B1E23),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF4B2C83),
+          brightness: Brightness.dark,
+        ),
+        pageTransitionsTheme: const PageTransitionsTheme(
+          builders: <TargetPlatform, PageTransitionsBuilder>{
+            TargetPlatform.android: CupertinoPageTransitionsBuilder(),
+            TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+          },
+        ),
       ),
       home: const SplashScreen(),
       routes: {
         '/home': (context) => const HomeScreen(),
         '/single': (context) => const SingleImageScreen(),
         '/multiple': (context) => const MultipleImagesScreen(),
+        '/create-pdf': (context) => const CreatePdfScreen(),
         '/results': (context) => const ResultFolderScreen(),
         '/settings': (context) => const SettingsScreen(),
         '/report-bugs': (context) => const ReportBugsScreen(),

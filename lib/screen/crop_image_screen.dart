@@ -78,7 +78,7 @@ class _CropImageScreenState extends State<CropImageScreen> {
                 Positioned.fill(
                   child: BackdropFilter(
                     filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-                    child: Container(color: Colors.black.withOpacity(0.35)),
+                    child: Container(color: Colors.black.withAlpha(89)),
                   ),
                 ),
                 Center(
@@ -124,7 +124,7 @@ class _CropImageScreenState extends State<CropImageScreen> {
                           }
                         },
                         baseColor: CropImageScreen.bg,
-                        maskColor: Colors.black.withOpacity(0.6),
+                        maskColor: Colors.black.withAlpha(153),
                         radius: 0,
                         withCircleUi: false,
                         interactive: true,
@@ -158,7 +158,7 @@ class _CropOverlayPainter extends CustomPainter {
       ..strokeWidth = 2;
 
     final gridPaint = Paint()
-      ..color = Colors.white.withOpacity(0.75)
+      ..color = Colors.white.withAlpha(191)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1;
 

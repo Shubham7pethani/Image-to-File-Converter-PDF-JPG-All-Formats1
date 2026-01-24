@@ -1,21 +1,83 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
-class HomeScreen extends StatelessWidget {
+import '../services/update_service.dart';
+
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
   static const Color _bg = Color(0xFF1B1E23);
   static const Color _card = Color(0xFF2B2940);
 
   @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  final UpdateService _updateService = UpdateService();
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_checkForShorebirdPatch());
+  }
+
+  Future<void> _checkForShorebirdPatch() async {
+    await Future<void>.delayed(const Duration(milliseconds: 400));
+    if (!mounted) return;
+
+    final decision = await _updateService.checkAndMaybeApplyUpdates(
+      platformIsAndroid:
+          !kIsWeb && defaultTargetPlatform == TargetPlatform.android,
+      allowShorebirdDownload: true,
+    );
+    if (!mounted) return;
+
+    if (decision.shorebirdRestartRequired) {
+      await _showRestartRequiredDialog();
+    }
+  }
+
+  Future<void> _showRestartRequiredDialog() async {
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Update Ready'),
+          content: const Text(
+            'A new update has been downloaded. Please restart the app to apply it.',
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () {
+                if (!kIsWeb &&
+                    defaultTargetPlatform == TargetPlatform.android) {
+                  SystemNavigator.pop();
+                  exit(0);
+                }
+                SystemNavigator.pop();
+              },
+              child: const Text('Restart'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: HomeScreen._bg,
       appBar: AppBar(
-        backgroundColor: _bg,
+        backgroundColor: HomeScreen._bg,
         elevation: 0,
         leading: Padding(
           padding: const EdgeInsets.all(8.0),
@@ -46,7 +108,7 @@ class HomeScreen extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
         children: [
           _FeatureCard(
-            background: _card,
+            background: HomeScreen._card,
             icon: Icons.image_rounded,
             title: 'Single Image',
             subtitle: 'Convert, Compress, Resize, Crop, Create PDF',
@@ -54,7 +116,7 @@ class HomeScreen extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           _FeatureCard(
-            background: _card,
+            background: HomeScreen._card,
             icon: Icons.collections_rounded,
             title: 'Multiple Images',
             subtitle: 'Convert, Compress, Resize, Crop, Create PDF',
@@ -62,7 +124,15 @@ class HomeScreen extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           _FeatureCard(
-            background: _card,
+            background: HomeScreen._card,
+            icon: Icons.picture_as_pdf_rounded,
+            title: 'Create PDF',
+            subtitle: 'Select multiple images and build a PDF with pages',
+            onTap: () => Navigator.of(context).pushNamed('/create-pdf'),
+          ),
+          const SizedBox(height: 16),
+          _FeatureCard(
+            background: HomeScreen._card,
             icon: Icons.folder_rounded,
             title: 'Result Folder',
             subtitle: 'View & manage all saved images and PDFs',
@@ -72,7 +142,7 @@ class HomeScreen extends StatelessWidget {
           Container(
             height: 240,
             decoration: BoxDecoration(
-              color: _card,
+              color: HomeScreen._card,
               borderRadius: BorderRadius.circular(18),
             ),
             clipBehavior: Clip.antiAlias,

@@ -118,10 +118,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _showSavedPath() async {
+    final rootContext = context;
+    final navigator = Navigator.of(rootContext);
+    final messenger = ScaffoldMessenger.of(rootContext);
+
     final dir = await _outputStorageService.getOutputDirectory();
     if (!mounted) return;
-
-    final rootContext = context;
 
     await showDialog<void>(
       context: context,
@@ -149,13 +151,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
               style: TextButton.styleFrom(foregroundColor: Colors.white70),
               onPressed: () async {
                 await Clipboard.setData(ClipboardData(text: dir.path));
-                if (context.mounted) {
-                  Navigator.of(context).pop();
-                }
                 if (!mounted) return;
-                ScaffoldMessenger.of(
-                  rootContext,
-                ).showSnackBar(const SnackBar(content: Text('Path copied')));
+                navigator.pop();
+                messenger.showSnackBar(
+                  const SnackBar(content: Text('Path copied')),
+                );
               },
               child: const Text('Copy'),
             ),
@@ -168,8 +168,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
               onPressed: () {
-                Navigator.of(context).pop();
-                Navigator.of(rootContext).pushNamed('/results');
+                navigator.pop();
+                navigator.pushNamed('/results');
               },
               child: const Text('Open'),
             ),
@@ -398,7 +398,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       onTap: _togglePhotoSpeedUp,
                       trailing: Switch(
                         value: _photoSpeedUp,
-                        activeColor: SettingsScreen.gold,
+                        activeThumbColor: SettingsScreen.gold,
                         onChanged: (v) async {
                           setState(() => _photoSpeedUp = v);
                           await _settings.setPhotoSpeedUp(v);
@@ -416,7 +416,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       onTap: _togglePreventDuplicates,
                       trailing: Switch(
                         value: _preventDuplicates,
-                        activeColor: SettingsScreen.gold,
+                        activeThumbColor: SettingsScreen.gold,
                         onChanged: (v) async {
                           setState(() => _preventDuplicates = v);
                           await _settings.setPreventDuplicates(v);

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -37,7 +39,9 @@ class _SplashScreenState extends State<SplashScreen> {
     });
 
     try {
-      final info = await PackageInfo.fromPlatform();
+      final info = await PackageInfo.fromPlatform().timeout(
+        const Duration(seconds: 1),
+      );
       final versionLabel = 'v${info.version}+${info.buildNumber}';
       final patchLabel = await _updateService.readCurrentPatchLabel();
       if (!mounted) return;
@@ -46,10 +50,18 @@ class _SplashScreenState extends State<SplashScreen> {
         _patch = patchLabel;
       });
 
-      final decision = await _updateService.checkAndMaybeApplyUpdates(
-        platformIsAndroid:
-            !kIsWeb && defaultTargetPlatform == TargetPlatform.android,
-      );
+      final decision = await _updateService
+          .checkAndMaybeApplyUpdates(
+            platformIsAndroid:
+                !kIsWeb && defaultTargetPlatform == TargetPlatform.android,
+            allowShorebirdDownload: false,
+          )
+          .timeout(
+            const Duration(seconds: 2),
+            onTimeout: () {
+              return AppUpdateDecision.none;
+            },
+          );
       if (!mounted) return;
 
       if (decision.mustUpdateFromStore) {
@@ -170,6 +182,11 @@ class _SplashScreenState extends State<SplashScreen> {
           actions: [
             ElevatedButton(
               onPressed: () {
+                if (!kIsWeb &&
+                    defaultTargetPlatform == TargetPlatform.android) {
+                  SystemNavigator.pop();
+                  exit(0);
+                }
                 SystemNavigator.pop();
               },
               child: const Text('Restart'),

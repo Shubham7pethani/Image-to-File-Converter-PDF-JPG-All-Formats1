@@ -63,6 +63,7 @@ class UpdateService {
 
   Future<AppUpdateDecision> checkAndMaybeApplyUpdates({
     required bool platformIsAndroid,
+    bool allowShorebirdDownload = false,
   }) async {
     if (!await hasInternetConnection()) {
       return AppUpdateDecision.none;
@@ -86,10 +87,11 @@ class UpdateService {
       return decision;
     }
 
-    // 2) Shorebird patch updates (Dart-only changes).
-    decision = decision.copyWith(
-      shorebirdRestartRequired: await _checkAndApplyShorebirdPatch(),
-    );
+    if (allowShorebirdDownload) {
+      decision = decision.copyWith(
+        shorebirdRestartRequired: await _checkAndApplyShorebirdPatch(),
+      );
+    }
 
     return decision;
   }
@@ -100,9 +102,11 @@ class UpdateService {
     }
 
     try {
-      final status = await _shorebirdUpdater.checkForUpdate();
+      final status = await _shorebirdUpdater.checkForUpdate().timeout(
+        const Duration(seconds: 3),
+      );
       if (status == UpdateStatus.outdated) {
-        await _shorebirdUpdater.update();
+        await _shorebirdUpdater.update().timeout(const Duration(seconds: 6));
         // After installing a patch, Shorebird expects restart.
         return true;
       }
@@ -117,7 +121,9 @@ class UpdateService {
 
   Future<bool> _isPlayStoreUpdateAvailable() async {
     try {
-      final info = await InAppUpdate.checkForUpdate();
+      final info = await InAppUpdate.checkForUpdate().timeout(
+        const Duration(seconds: 2),
+      );
       return info.updateAvailability == UpdateAvailability.updateAvailable;
     } on Exception {
       // This can throw when not installed from Play Store.

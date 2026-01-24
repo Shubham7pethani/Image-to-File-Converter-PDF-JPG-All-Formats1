@@ -1,10 +1,109 @@
-import 'dart:typed_data';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:image/image.dart' as img;
 
 import 'models.dart';
+
+Uint8List _pureDartEncodeFromSource(Map<String, Object?> args) {
+  final bytes = args['bytes'] as Uint8List;
+  final compressEnabled = (args['compressEnabled'] as bool?) ?? true;
+  final quality = (args['quality'] as int?) ?? 80;
+  final resizeEnabled = (args['resizeEnabled'] as bool?) ?? false;
+  final resizeWidth = args['resizeWidth'] as int?;
+  final resizeHeight = args['resizeHeight'] as int?;
+  final formatIndex = (args['format'] as int?) ?? 0;
+  final safeIndex = formatIndex.clamp(0, OutputFormat.values.length - 1);
+  final format = OutputFormat.values[safeIndex];
+
+  final decoded = img.decodeImage(bytes);
+  if (decoded == null) {
+    throw StateError('Invalid image');
+  }
+
+  img.Image outImage = decoded;
+  if (resizeEnabled && resizeWidth != null && resizeHeight != null) {
+    outImage = img.copyResize(
+      outImage,
+      width: resizeWidth,
+      height: resizeHeight,
+    );
+  }
+
+  final q = compressEnabled ? quality.clamp(1, 100) : 100;
+
+  switch (format) {
+    case OutputFormat.jpg:
+    case OutputFormat.jpeg:
+      return Uint8List.fromList(img.encodeJpg(outImage, quality: q));
+    case OutputFormat.png:
+      return Uint8List.fromList(img.encodePng(outImage));
+    case OutputFormat.gif:
+      return Uint8List.fromList(img.encodeGif(outImage));
+    case OutputFormat.bmp:
+      return Uint8List.fromList(img.encodeBmp(outImage));
+    case OutputFormat.webp:
+      return Uint8List.fromList(img.encodePng(outImage));
+    case OutputFormat.pdf:
+      return Uint8List.fromList(img.encodeJpg(outImage, quality: q));
+  }
+}
+
+Map<String, Object?> _pureDartPreviewFromSource(Map<String, Object?> args) {
+  final bytes = args['bytes'] as Uint8List;
+  final compressEnabled = (args['compressEnabled'] as bool?) ?? true;
+  final quality = (args['quality'] as int?) ?? 80;
+  final resizeEnabled = (args['resizeEnabled'] as bool?) ?? false;
+  final resizeWidth = args['resizeWidth'] as int?;
+  final resizeHeight = args['resizeHeight'] as int?;
+  final formatIndex = (args['format'] as int?) ?? 0;
+  final safeIndex = formatIndex.clamp(0, OutputFormat.values.length - 1);
+  final format = OutputFormat.values[safeIndex];
+
+  final decoded = img.decodeImage(bytes);
+  if (decoded == null) {
+    throw StateError('Invalid image');
+  }
+
+  img.Image outImage = decoded;
+  if (resizeEnabled && resizeWidth != null && resizeHeight != null) {
+    outImage = img.copyResize(
+      outImage,
+      width: resizeWidth,
+      height: resizeHeight,
+    );
+  }
+
+  final q = compressEnabled ? quality.clamp(1, 100) : 100;
+
+  Uint8List outBytes;
+  switch (format) {
+    case OutputFormat.jpg:
+    case OutputFormat.jpeg:
+      outBytes = Uint8List.fromList(img.encodeJpg(outImage, quality: q));
+      break;
+    case OutputFormat.png:
+      outBytes = Uint8List.fromList(img.encodePng(outImage));
+      break;
+    case OutputFormat.gif:
+      outBytes = Uint8List.fromList(img.encodeGif(outImage));
+      break;
+    case OutputFormat.bmp:
+      outBytes = Uint8List.fromList(img.encodeBmp(outImage));
+      break;
+    case OutputFormat.webp:
+      outBytes = Uint8List.fromList(img.encodePng(outImage));
+      break;
+    case OutputFormat.pdf:
+      outBytes = Uint8List.fromList(img.encodeJpg(outImage, quality: q));
+      break;
+  }
+
+  return <String, Object?>{
+    'bytes': outBytes,
+    'width': outImage.width,
+    'height': outImage.height,
+  };
+}
 
 class ImageProcessingService {
   const ImageProcessingService();
@@ -88,9 +187,15 @@ class ImageProcessingService {
       }
     }
 
-    final decoded = decode(sourceBytes);
-    final resized = applyResize(image: decoded, options: options);
-    return encode(resized, options);
+    return compute(_pureDartEncodeFromSource, <String, Object?>{
+      'bytes': sourceBytes,
+      'compressEnabled': options.compressEnabled,
+      'quality': options.quality,
+      'resizeEnabled': options.resizeEnabled,
+      'resizeWidth': options.resizeWidth,
+      'resizeHeight': options.resizeHeight,
+      'format': options.format.index,
+    });
   }
 
   img.Image applyResize({
@@ -147,8 +252,21 @@ class ImageProcessingService {
       }
     }
 
-    final decoded = decode(input.bytes);
-    return processDecodedForPreview(decoded: decoded, options: options);
+    final out = await compute(_pureDartPreviewFromSource, <String, Object?>{
+      'bytes': input.bytes,
+      'compressEnabled': options.compressEnabled,
+      'quality': options.quality,
+      'resizeEnabled': options.resizeEnabled,
+      'resizeWidth': options.resizeWidth,
+      'resizeHeight': options.resizeHeight,
+      'format': options.format.index,
+    });
+
+    return ProcessedImage(
+      bytes: out['bytes'] as Uint8List,
+      width: out['width'] as int,
+      height: out['height'] as int,
+    );
   }
 
   Future<ProcessedImage> processDecodedForPreview({

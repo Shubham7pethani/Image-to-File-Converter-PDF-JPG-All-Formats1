@@ -4,23 +4,21 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
-import 'image_editor_screen.dart';
 import '../services/app_settings.dart';
 import '../services/models.dart';
+import 'pdf_pages_editor.dart';
 
-class ChoosePhotoScreen extends StatefulWidget {
-  const ChoosePhotoScreen({super.key, required this.allowMultiple});
-
-  final bool allowMultiple;
+class CreatePdfScreen extends StatefulWidget {
+  const CreatePdfScreen({super.key});
 
   static const Color bg = Color(0xFF1B1E23);
   static const Color card = Color(0xFF2B2940);
 
   @override
-  State<ChoosePhotoScreen> createState() => _ChoosePhotoScreenState();
+  State<CreatePdfScreen> createState() => _CreatePdfScreenState();
 }
 
-class _ChoosePhotoScreenState extends State<ChoosePhotoScreen> {
+class _CreatePdfScreenState extends State<CreatePdfScreen> {
   final ImagePicker _picker = ImagePicker();
   final AppSettings _settings = const AppSettings();
   bool _isLoading = false;
@@ -92,7 +90,7 @@ class _ChoosePhotoScreenState extends State<ChoosePhotoScreen> {
         if (!mounted) return;
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (context) => ImageEditorScreen(images: images),
+            builder: (context) => PdfPagesEditor(images: images),
           ),
         );
       }),
@@ -112,32 +110,22 @@ class _ChoosePhotoScreenState extends State<ChoosePhotoScreen> {
 
   Future<void> _pickFromGallery() async {
     await _withLoader(() async {
-      if (widget.allowMultiple) {
-        final files = await _picker.pickMultiImage();
-        if (!mounted) return;
-        if (files.isEmpty) return;
-        final images = <SelectedImage>[];
-        var i = 0;
-        for (final f in files) {
-          images.add(SelectedImage(name: f.name, bytes: await f.readAsBytes()));
-          i++;
-          if (i % 2 == 0) {
-            await Future<void>.delayed(Duration.zero);
-          }
+      final files = await _picker.pickMultiImage();
+      if (!mounted) return;
+      if (files.isEmpty) return;
+      final images = <SelectedImage>[];
+      var i = 0;
+      for (final f in files) {
+        images.add(SelectedImage(name: f.name, bytes: await f.readAsBytes()));
+        i++;
+        if (i % 2 == 0) {
+          await Future<void>.delayed(Duration.zero);
         }
-        if (!mounted) return;
-        final preventDuplicates = await _settings.getPreventDuplicates();
-        if (!mounted) return;
-        _openEditor(preventDuplicates ? _dedupeImages(images) : images);
-        return;
       }
-
-      final file = await _picker.pickImage(source: ImageSource.gallery);
       if (!mounted) return;
-      if (file == null) return;
-      final bytes = await file.readAsBytes();
+      final preventDuplicates = await _settings.getPreventDuplicates();
       if (!mounted) return;
-      _openEditor([SelectedImage(name: file.name, bytes: bytes)]);
+      _openEditor(preventDuplicates ? _dedupeImages(images) : images);
     });
   }
 
@@ -145,7 +133,7 @@ class _ChoosePhotoScreenState extends State<ChoosePhotoScreen> {
     await _withLoader(() async {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.image,
-        allowMultiple: widget.allowMultiple,
+        allowMultiple: true,
         withData: true,
       );
       if (!mounted) return;
@@ -181,9 +169,9 @@ class _ChoosePhotoScreenState extends State<ChoosePhotoScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: ChoosePhotoScreen.bg,
+      backgroundColor: CreatePdfScreen.bg,
       appBar: AppBar(
-        backgroundColor: ChoosePhotoScreen.bg,
+        backgroundColor: CreatePdfScreen.bg,
         foregroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
@@ -191,7 +179,7 @@ class _ChoosePhotoScreenState extends State<ChoosePhotoScreen> {
           onPressed: () => Navigator.of(context).maybePop(),
         ),
         title: const Text(
-          'Choose Photo',
+          'Choose Photos for PDF',
           style: TextStyle(fontWeight: FontWeight.w700),
         ),
       ),
