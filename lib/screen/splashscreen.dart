@@ -7,7 +7,9 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../services/external_open_service.dart';
 import '../services/update_service.dart';
+import 'external_open_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -93,6 +95,19 @@ class _SplashScreenState extends State<SplashScreen> {
           _isLoading = false;
           _error = 'Permission required to continue.';
         });
+        return;
+      }
+
+      final initialPath = await ExternalOpenService.instance
+          .consumeInitialPath();
+      if (!mounted) return;
+
+      if (initialPath != null && initialPath.isNotEmpty) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => ExternalOpenScreen(path: initialPath),
+          ),
+        );
         return;
       }
 

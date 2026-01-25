@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
+import 'services/external_open_service.dart';
 import 'screen/splashscreen.dart';
 import 'screen/home_screen.dart';
 import 'screen/multiple_images_screen.dart';
@@ -12,6 +13,8 @@ import 'screen/result_folder_screen.dart';
 import 'screen/single_image_screen.dart';
 import 'screen/settings_screen.dart';
 import 'screen/create_pdf_screen.dart';
+import 'screen/star_imp.dart';
+import 'screen/external_open_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,14 +23,43 @@ Future<void> main() async {
   unawaited(MobileAds.instance.initialize());
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
+  StreamSubscription<String>? _externalOpenSub;
+
+  @override
+  void initState() {
+    super.initState();
+
+    unawaited(ExternalOpenService.instance.init());
+    _externalOpenSub = ExternalOpenService.instance.stream.listen((path) {
+      final nav = _navigatorKey.currentState;
+      if (nav == null) return;
+      nav.push(
+        MaterialPageRoute(builder: (_) => ExternalOpenScreen(path: path)),
+      );
+    });
+  }
+
+  @override
+  void dispose() {
+    _externalOpenSub?.cancel();
+    super.dispose();
+  }
 
   // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Image to File Converter – PDF, JPG & All Formats',
+      navigatorKey: _navigatorKey,
       builder: (context, child) {
         return ColoredBox(
           color: const Color(0xFF1B1E23),
@@ -72,6 +104,7 @@ class MyApp extends StatelessWidget {
         '/multiple': (context) => const MultipleImagesScreen(),
         '/create-pdf': (context) => const CreatePdfScreen(),
         '/results': (context) => const ResultFolderScreen(),
+        '/star-imp': (context) => const StarImpScreen(),
         '/settings': (context) => const SettingsScreen(),
         '/report-bugs': (context) => const ReportBugsScreen(),
         '/privacy-policy': (context) => const PrivacyPolicyScreen(),

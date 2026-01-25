@@ -1,40 +1,39 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:open_filex/open_filex.dart';
 
-import '../services/gallery_save_service.dart';
 import '../services/branded_share_service.dart';
+import '../services/gallery_save_service.dart';
 import '../services/important_service.dart';
 import '../services/output_storage_service.dart';
 
-class ResultFolderScreen extends StatefulWidget {
-  const ResultFolderScreen({super.key});
+class StarImpScreen extends StatefulWidget {
+  const StarImpScreen({super.key});
 
   static const Color _bg = Color(0xFF1B1E23);
+  static const Color _card = Color(0xFF2B2940);
+  static const Color _gold = Color(0xFFE2C078);
 
   @override
-  State<ResultFolderScreen> createState() => _ResultFolderScreenState();
+  State<StarImpScreen> createState() => _StarImpScreenState();
 }
 
-class _ResultFolderScreenState extends State<ResultFolderScreen> {
+class _StarImpScreenState extends State<StarImpScreen> {
   final OutputStorageService _outputStorageService =
       const OutputStorageService();
   final GallerySaveService _gallerySaveService = const GallerySaveService();
   final ImportantService _importantService = const ImportantService();
   final BrandedShareService _brandedShareService = const BrandedShareService();
 
-  static const Color _card = Color(0xFF2B2940);
-  static const Color _gold = Color(0xFFE2C078);
-
   bool _loading = true;
-  List<_OutputItem> _items = const [];
-  Set<String> _importantPaths = <String>{};
+  List<_ImpItem> _items = const [];
 
   @override
   void initState() {
     super.initState();
-    _refresh();
+    unawaited(_refresh());
   }
 
   Future<void> _refresh() async {
@@ -45,14 +44,16 @@ class _ResultFolderScreenState extends State<ResultFolderScreen> {
     try {
       final important = await _importantService.getPaths();
       final entities = await _outputStorageService.listOutputs();
-      final items = <_OutputItem>[];
+
+      final items = <_ImpItem>[];
       for (final e in entities) {
+        if (!important.contains(e.path)) continue;
         final stat = await e.stat();
         final name = e.uri.pathSegments.isEmpty
             ? e.path
             : e.uri.pathSegments.last;
         items.add(
-          _OutputItem(
+          _ImpItem(
             path: e.path,
             name: name,
             bytes: stat.size,
@@ -61,41 +62,18 @@ class _ResultFolderScreenState extends State<ResultFolderScreen> {
         );
       }
 
-      final existingPaths = items.map((e) => e.path).toSet();
-      final normalizedImportant = important.intersection(existingPaths);
-      if (normalizedImportant.length != important.length) {
-        await _importantService.setAll(normalizedImportant);
-      }
-
       if (!mounted) return;
       setState(() {
         _items = items;
-        _importantPaths = normalizedImportant;
         _loading = false;
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _loading = false;
         _items = const [];
-        _importantPaths = <String>{};
+        _loading = false;
       });
     }
-  }
-
-  Future<void> _toggleImportant(_OutputItem item) async {
-    final nowImportant = await _importantService.toggle(item.path);
-    if (!mounted) return;
-
-    setState(() {
-      if (nowImportant) {
-        _importantPaths = <String>{..._importantPaths, item.path};
-      } else {
-        final next = <String>{..._importantPaths};
-        next.remove(item.path);
-        _importantPaths = next;
-      }
-    });
   }
 
   String _bytesLabel(int bytes) {
@@ -116,15 +94,15 @@ class _ResultFolderScreenState extends State<ResultFolderScreen> {
     return Icons.insert_drive_file;
   }
 
-  Future<void> _open(_OutputItem item) async {
+  Future<void> _open(_ImpItem item) async {
     await OpenFilex.open(item.path);
   }
 
-  Future<void> _share(_OutputItem item) async {
+  Future<void> _share(_ImpItem item) async {
     await _brandedShareService.shareFile(filePath: item.path);
   }
 
-  Future<void> _downloadToPhone(_OutputItem item) async {
+  Future<void> _downloadToPhone(_ImpItem item) async {
     final ok = await _gallerySaveService.saveFile(filePath: item.path);
     if (!mounted) return;
 
@@ -148,11 +126,16 @@ class _ResultFolderScreenState extends State<ResultFolderScreen> {
     );
   }
 
-  Future<void> _delete(_OutputItem item) async {
+  Future<void> _removeImportant(_ImpItem item) async {
+    await _importantService.remove(item.path);
+    await _refresh();
+  }
+
+  Future<void> _delete(_ImpItem item) async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: _card,
+        backgroundColor: StarImpScreen._card,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(18),
           side: const BorderSide(color: Color(0x38E2C078)),
@@ -197,6 +180,7 @@ class _ResultFolderScreenState extends State<ResultFolderScreen> {
       await File(item.path).delete();
     } catch (_) {}
 
+    await _importantService.remove(item.path);
     await _refresh();
   }
 
@@ -206,7 +190,7 @@ class _ResultFolderScreenState extends State<ResultFolderScreen> {
     required String label,
     Color? color,
   }) {
-    final c = color ?? _gold;
+    final c = color ?? StarImpScreen._gold;
     return PopupMenuItem<String>(
       value: value,
       child: Row(
@@ -228,22 +212,16 @@ class _ResultFolderScreenState extends State<ResultFolderScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: ResultFolderScreen._bg,
+      backgroundColor: StarImpScreen._bg,
       appBar: AppBar(
-        backgroundColor: ResultFolderScreen._bg,
+        backgroundColor: StarImpScreen._bg,
         foregroundColor: Colors.white,
-        title: const Text('Result Folder'),
+        elevation: 0,
+        title: const Text(
+          'Important',
+          style: TextStyle(fontWeight: FontWeight.w800),
+        ),
         actions: [
-          IconButton(
-            onPressed: () async {
-              final navigator = Navigator.of(context);
-              await navigator.pushNamed('/star-imp');
-              if (!mounted) return;
-              await _refresh();
-            },
-            icon: const Icon(Icons.workspace_premium_outlined),
-            color: const Color(0xFFE2C078),
-          ),
           IconButton(onPressed: _refresh, icon: const Icon(Icons.refresh)),
         ],
       ),
@@ -253,13 +231,6 @@ class _ResultFolderScreenState extends State<ResultFolderScreen> {
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
           children: [
-            const Padding(
-              padding: EdgeInsets.only(bottom: 10),
-              child: Text(
-                'Your exports are saved here inside the app.\nAlso saved to Gallery: Pictures/ImageConverter',
-                style: TextStyle(color: Colors.white54, fontSize: 12),
-              ),
-            ),
             if (_loading)
               const Padding(
                 padding: EdgeInsets.only(top: 24),
@@ -276,7 +247,7 @@ class _ResultFolderScreenState extends State<ResultFolderScreen> {
                 padding: EdgeInsets.only(top: 24),
                 child: Center(
                   child: Text(
-                    'No files yet.',
+                    'No important files yet.',
                     style: TextStyle(color: Colors.white70, fontSize: 16),
                   ),
                 ),
@@ -284,7 +255,7 @@ class _ResultFolderScreenState extends State<ResultFolderScreen> {
             else
               ..._items.map(
                 (item) => Card(
-                  color: _card,
+                  color: StarImpScreen._card,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
                     side: const BorderSide(color: Color(0x38E2C078)),
@@ -337,19 +308,16 @@ class _ResultFolderScreenState extends State<ResultFolderScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         IconButton(
-                          onPressed: () => _toggleImportant(item),
-                          icon: Icon(
-                            _importantPaths.contains(item.path)
-                                ? Icons.workspace_premium
-                                : Icons.workspace_premium_outlined,
-                          ),
-                          color: _importantPaths.contains(item.path)
-                              ? _gold
-                              : Colors.white54,
+                          onPressed: () => _removeImportant(item),
+                          icon: const Icon(Icons.workspace_premium),
+                          color: StarImpScreen._gold,
                         ),
                         PopupMenuButton<String>(
-                          icon: const Icon(Icons.more_vert, color: _gold),
-                          color: _card,
+                          icon: const Icon(
+                            Icons.more_vert,
+                            color: StarImpScreen._gold,
+                          ),
+                          color: StarImpScreen._card,
                           elevation: 12,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),
@@ -397,8 +365,8 @@ class _ResultFolderScreenState extends State<ResultFolderScreen> {
   }
 }
 
-class _OutputItem {
-  const _OutputItem({
+class _ImpItem {
+  const _ImpItem({
     required this.path,
     required this.name,
     required this.bytes,

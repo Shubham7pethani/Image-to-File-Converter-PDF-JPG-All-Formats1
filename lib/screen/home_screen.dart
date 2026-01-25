@@ -93,7 +93,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         actions: [
           IconButton(
-            onPressed: () {},
+            onPressed: () => Navigator.of(context).pushNamed('/star-imp'),
             icon: const Icon(Icons.workspace_premium_outlined),
             color: const Color(0xFFE2C078),
           ),
