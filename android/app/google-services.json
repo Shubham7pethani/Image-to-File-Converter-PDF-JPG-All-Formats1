@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "463932665024",
+    "project_id": "imageconverternotification",
+    "storage_bucket": "imageconverternotification.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:463932665024:android:b5ee8a469dbf2c6074d125",
+        "android_client_info": {
+          "package_name": "com.sholo.imageconverter"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC1v9IIUj2XI9TOYwD_OraDIK5W5vzaCSo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

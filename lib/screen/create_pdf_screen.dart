@@ -23,6 +23,8 @@ class _CreatePdfScreenState extends State<CreatePdfScreen> {
   final AppSettings _settings = const AppSettings();
   bool _isLoading = false;
 
+  static const int _maxPdfImages = 150;
+
   List<SelectedImage> _dedupeImages(List<SelectedImage> images) {
     final seen = <String>{};
     final out = <SelectedImage>[];
@@ -110,12 +112,25 @@ class _CreatePdfScreenState extends State<CreatePdfScreen> {
 
   Future<void> _pickFromGallery() async {
     await _withLoader(() async {
-      final files = await _picker.pickMultiImage();
+      final files = await _picker.pickMultiImage(limit: _maxPdfImages);
       if (!mounted) return;
       if (files.isEmpty) return;
+
+      final cappedFiles = files.length > _maxPdfImages
+          ? files.take(_maxPdfImages).toList()
+          : files;
+
+      if (files.length > _maxPdfImages) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Selected more than 150 images. Using first 150.'),
+          ),
+        );
+      }
+
       final images = <SelectedImage>[];
       var i = 0;
-      for (final f in files) {
+      for (final f in cappedFiles) {
         images.add(SelectedImage(name: f.name, bytes: await f.readAsBytes()));
         i++;
         if (i % 2 == 0) {
@@ -149,6 +164,20 @@ class _CreatePdfScreenState extends State<CreatePdfScreen> {
         if (i % 8 == 0) {
           await Future<void>.delayed(Duration.zero);
         }
+      }
+
+      if (images.length > _maxPdfImages) {
+        final capped = images.take(_maxPdfImages).toList();
+        images
+          ..clear()
+          ..addAll(capped);
+
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Selected more than 150 images. Using first 150.'),
+          ),
+        );
       }
 
       if (images.isEmpty) {

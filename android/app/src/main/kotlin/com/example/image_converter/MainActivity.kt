@@ -1,14 +1,23 @@
 package com.sholo.imageconverter
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.ComponentName
 import android.content.Intent
 import android.content.Context
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.provider.OpenableColumns
 import android.view.LayoutInflater
 import android.view.View
 import android.widget.Button
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import com.google.android.gms.ads.nativead.NativeAd
 import com.google.android.gms.ads.nativead.NativeAdView
 import io.flutter.embedding.android.FlutterActivity
@@ -20,8 +29,15 @@ import java.io.FileOutputStream
 
 class MainActivity : FlutterActivity() {
   private val externalOpenChannelName = "com.sholo.imageconverter/external_open"
+  private val launcherIconChannelName = "com.sholo.imageconverter/launcher_icon"
+  private val routeChannelName = "com.sholo.imageconverter/deeplink"
+  private val progressChannelName = "com.sholo.imageconverter/progress_notification"
   private var externalOpenChannel: MethodChannel? = null
+  private var launcherIconChannel: MethodChannel? = null
+  private var routeChannel: MethodChannel? = null
+  private var progressChannel: MethodChannel? = null
   private var initialExternalPath: String? = null
+  private var initialRoute: String? = null
 
   private val supportedMimeTypes = setOf(
     "application/pdf",
@@ -53,7 +69,72 @@ class MainActivity : FlutterActivity() {
       result.notImplemented()
     }
 
+    launcherIconChannel = MethodChannel(
+      flutterEngine.dartExecutor.binaryMessenger,
+      launcherIconChannelName,
+    )
+    launcherIconChannel?.setMethodCallHandler { call, result ->
+      if (call.method == "setLauncherIcon") {
+        val key = call.argument<String>("key")
+        result.success(setLauncherIcon(key))
+        return@setMethodCallHandler
+      }
+      result.notImplemented()
+    }
+
+    routeChannel = MethodChannel(
+      flutterEngine.dartExecutor.binaryMessenger,
+      routeChannelName,
+    )
+    routeChannel?.setMethodCallHandler { call, result ->
+      if (call.method == "getInitialRoute") {
+        val route = initialRoute
+        initialRoute = null
+        result.success(route)
+        return@setMethodCallHandler
+      }
+      result.notImplemented()
+    }
+
+    progressChannel = MethodChannel(
+      flutterEngine.dartExecutor.binaryMessenger,
+      progressChannelName,
+    )
+    progressChannel?.setMethodCallHandler { call, result ->
+      when (call.method) {
+        "start" -> {
+          val total = call.argument<Int>("total") ?: 0
+          val title = call.argument<String>("title")
+          startOrUpdateSaveService(done = 0, total = total, title = title)
+          result.success(true)
+          return@setMethodCallHandler
+        }
+        "update" -> {
+          val done = call.argument<Int>("done") ?: 0
+          val total = call.argument<Int>("total") ?: 0
+          val title = call.argument<String>("title")
+          startOrUpdateSaveService(done = done, total = total, title = title)
+          result.success(true)
+          return@setMethodCallHandler
+        }
+        "complete" -> {
+          val title = call.argument<String>("title")
+          val body = call.argument<String>("body")
+          completeSaveService(title = title, body = body)
+          result.success(true)
+          return@setMethodCallHandler
+        }
+        "cancel" -> {
+          cancelSaveService()
+          result.success(true)
+          return@setMethodCallHandler
+        }
+        else -> result.notImplemented()
+      }
+    }
+
     captureInitialExternalOpen(intent)
+    captureInitialRoute(intent)
   }
 
   override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
@@ -65,11 +146,17 @@ class MainActivity : FlutterActivity() {
     super.onNewIntent(intent)
     setIntent(intent)
     deliverExternalOpen(intent)
+    deliverRoute(intent)
   }
 
   private fun captureInitialExternalOpen(intent: Intent?) {
     val path = extractPathFromIntent(intent) ?: return
     initialExternalPath = path
+  }
+
+  private fun captureInitialRoute(intent: Intent?) {
+    val route = extractRouteFromIntent(intent) ?: return
+    initialRoute = route
   }
 
   private fun deliverExternalOpen(intent: Intent?) {
@@ -82,6 +169,16 @@ class MainActivity : FlutterActivity() {
     channel.invokeMethod("onOpenFile", path)
   }
 
+  private fun deliverRoute(intent: Intent?) {
+    val route = extractRouteFromIntent(intent) ?: return
+    val channel = routeChannel
+    if (channel == null) {
+      initialRoute = route
+      return
+    }
+    channel.invokeMethod("onRoute", route)
+  }
+
   private fun extractPathFromIntent(intent: Intent?): String? {
     if (intent == null) return null
     if (intent.action != Intent.ACTION_VIEW) return null
@@ -92,6 +189,118 @@ class MainActivity : FlutterActivity() {
     if (mime == "image/webp") return null
     if (mime != null && !supportedMimeTypes.contains(mime)) return null
     return copyUriToCache(uri, mime)
+  }
+
+  private fun extractRouteFromIntent(intent: Intent?): String? {
+    if (intent == null) return null
+    if (intent.action != Intent.ACTION_VIEW) return null
+    val uri = intent.data ?: return null
+    if (uri.scheme != "imageconverter") return null
+    if (uri.host != "open") return null
+    val route = uri.getQueryParameter("route")?.trim()
+    if (route.isNullOrEmpty()) return null
+    return route
+  }
+
+  private fun ensureNotificationChannel(channelId: String, name: String, importance: Int) {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+    val nm = getSystemService(NotificationManager::class.java)
+    val existing = nm?.getNotificationChannel(channelId)
+    if (existing != null) return
+    val channel = NotificationChannel(channelId, name, importance)
+    nm?.createNotificationChannel(channel)
+  }
+
+  private fun startOrUpdateSaveService(done: Int, total: Int, title: String?) {
+    val intent = Intent(this, SaveForegroundService::class.java).apply {
+      action = if (done <= 0) SaveForegroundService.ACTION_START else SaveForegroundService.ACTION_UPDATE
+      putExtra(SaveForegroundService.EXTRA_DONE, done)
+      putExtra(SaveForegroundService.EXTRA_TOTAL, total)
+      if (!title.isNullOrEmpty()) putExtra(SaveForegroundService.EXTRA_TITLE, title)
+    }
+
+    ContextCompat.startForegroundService(this, intent)
+  }
+
+  private fun completeSaveService(title: String?, body: String?) {
+    val intent = Intent(this, SaveForegroundService::class.java).apply {
+      action = SaveForegroundService.ACTION_COMPLETE
+      if (!title.isNullOrEmpty()) putExtra(SaveForegroundService.EXTRA_TITLE, title)
+      if (!body.isNullOrEmpty()) putExtra(SaveForegroundService.EXTRA_BODY, body)
+    }
+    startService(intent)
+  }
+
+  private fun cancelSaveService() {
+    val intent = Intent(this, SaveForegroundService::class.java).apply {
+      action = SaveForegroundService.ACTION_CANCEL
+    }
+    startService(intent)
+  }
+
+  private fun showSaveProgressNotification(done: Int, total: Int, title: String?) {
+    val channelId = "save_progress"
+    ensureNotificationChannel(channelId, "Saving", NotificationManager.IMPORTANCE_LOW)
+
+    val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
+      ?: Intent(this, MainActivity::class.java)
+
+    val pendingFlags = PendingIntent.FLAG_UPDATE_CURRENT or
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
+    val pending = PendingIntent.getActivity(this, 3001, launchIntent, pendingFlags)
+
+    val safeTotal = if (total < 0) 0 else total
+    val safeDone = if (done < 0) 0 else done
+    val shownTitle = title?.takeIf { it.isNotBlank() } ?: "Saving"
+    val shownBody = if (safeTotal > 0) "${safeDone.coerceAtMost(safeTotal)}/$safeTotal" else "Working"
+
+    val builder = NotificationCompat.Builder(this, channelId)
+      .setSmallIcon(R.drawable.onlylogo)
+      .setContentTitle(shownTitle)
+      .setContentText(shownBody)
+      .setOnlyAlertOnce(true)
+      .setOngoing(true)
+      .setAutoCancel(false)
+      .setContentIntent(pending)
+      .setPriority(NotificationCompat.PRIORITY_LOW)
+
+    if (safeTotal > 0) {
+      builder.setProgress(safeTotal, safeDone.coerceAtMost(safeTotal), false)
+    } else {
+      builder.setProgress(0, 0, true)
+    }
+
+    NotificationManagerCompat.from(this).notify(3001, builder.build())
+  }
+
+  private fun showSaveCompletedNotification(title: String?, body: String?) {
+    val channelId = "save_complete"
+    ensureNotificationChannel(channelId, "Completed", NotificationManager.IMPORTANCE_DEFAULT)
+
+    NotificationManagerCompat.from(this).cancel(3001)
+
+    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("imageconverter://open?route=results")).apply {
+      addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+    }
+
+    val pendingFlags = PendingIntent.FLAG_UPDATE_CURRENT or
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
+    val pending = PendingIntent.getActivity(this, 3002, intent, pendingFlags)
+
+    val notification = NotificationCompat.Builder(this, channelId)
+      .setSmallIcon(R.drawable.onlylogo)
+      .setContentTitle(title?.takeIf { it.isNotBlank() } ?: "Completed")
+      .setContentText(body?.takeIf { it.isNotBlank() } ?: "Tap to see results")
+      .setAutoCancel(true)
+      .setContentIntent(pending)
+      .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+      .build()
+
+    NotificationManagerCompat.from(this).notify(3002, notification)
+  }
+
+  private fun cancelSaveProgressNotification() {
+    NotificationManagerCompat.from(this).cancel(3001)
   }
 
   private fun copyUriToCache(uri: Uri, mime: String?): String? {
@@ -146,6 +355,35 @@ class MainActivity : FlutterActivity() {
       }
     } catch (_: Throwable) {
       null
+    }
+  }
+
+  private fun setLauncherIcon(key: String?): Boolean {
+    return try {
+      val aliases = linkedMapOf(
+        "default" to "com.sholo.imageconverter.LauncherDefault",
+        "jan" to "com.sholo.imageconverter.LauncherJan",
+        "feb" to "com.sholo.imageconverter.LauncherFeb",
+        "mar" to "com.sholo.imageconverter.LauncherMar",
+      )
+      val desired = aliases[key] ?: aliases["default"]!!
+
+      val pm = applicationContext.packageManager
+      for ((_, className) in aliases) {
+        val state = if (className == desired) {
+          PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+        } else {
+          PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+        }
+        pm.setComponentEnabledSetting(
+          ComponentName(applicationContext, className),
+          state,
+          PackageManager.DONT_KILL_APP,
+        )
+      }
+      true
+    } catch (_: Throwable) {
+      false
     }
   }
 }

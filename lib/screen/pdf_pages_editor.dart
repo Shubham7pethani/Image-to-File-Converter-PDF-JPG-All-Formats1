@@ -1,10 +1,11 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../services/createpdflogic.dart';
-import '../services/gallery_save_service.dart';
 import '../services/image_processing_service.dart';
 import '../services/models.dart';
 import '../services/output_storage_service.dart';
@@ -30,7 +31,6 @@ class _PdfPagesEditorState extends State<PdfPagesEditor> {
       const ImageProcessingService();
   final OutputStorageService _outputStorageService =
       const OutputStorageService();
-  final GallerySaveService _gallerySaveService = const GallerySaveService();
 
   late final PdfExportService _pdfExportService = PdfExportService(
     imageProcessingService: _imageProcessingService,
@@ -41,6 +41,13 @@ class _PdfPagesEditorState extends State<PdfPagesEditor> {
   int _activeIndex = 0;
   _PdfEditorStage _stage = _PdfEditorStage.edit;
   bool _isSaving = false;
+
+  int _saveDone = 0;
+  int _saveTotal = 0;
+
+  static const MethodChannel _progressChannel = MethodChannel(
+    'com.sholo.imageconverter/progress_notification',
+  );
 
   final TextEditingController _wController = TextEditingController();
   final TextEditingController _hController = TextEditingController();
@@ -224,40 +231,131 @@ class _PdfPagesEditorState extends State<PdfPagesEditor> {
 
     setState(() {
       _isSaving = true;
+      _saveDone = 0;
+      _saveTotal = _logic.pages.length;
     });
+
+    if (!kIsWeb) {
+      try {
+        unawaited(
+          _progressChannel.invokeMethod('start', {
+            'total': _logic.pages.length,
+            'title': 'Saving PDF',
+          }),
+        );
+      } catch (_) {}
+    }
 
     await Future<void>.delayed(Duration.zero);
     await WidgetsBinding.instance.endOfFrame;
     if (!mounted) return;
 
     try {
-      final options = <ImageProcessOptions>[];
-      for (var i = 0; i < _logic.pages.length; i++) {
-        options.add(_optionsForIndex(i));
+      final totalPages = _logic.pages.length;
+      final stamp = _timestamp();
+
+      final pagesPerPart = totalPages <= 150
+          ? totalPages
+          : (totalPages > 200
+                ? 20
+                : (totalPages > 80 ? 25 : (totalPages > 40 ? 40 : 60)));
+      final parts = (totalPages / pagesPerPart).ceil();
+      final maxSide = totalPages > 200
+          ? 900
+          : (totalPages > 150
+                ? 1200
+                : (totalPages > 80 ? 1500 : (totalPages > 40 ? 1800 : 2200)));
+
+      var processed = 0;
+
+      for (var part = 0; part < parts; part++) {
+        final start = part * pagesPerPart;
+        final end = (start + pagesPerPart).clamp(0, totalPages);
+        if (start >= end) break;
+
+        final jpgBytesByPage = <Uint8List>[];
+        for (var i = start; i < end; i++) {
+          final options = _optionsForIndex(i);
+          final q = options.quality < 85 ? 85 : options.quality;
+          final jpgBytes = await _pdfExportService.encodeJpgForPdfPage(
+            image: _logic.pages[i],
+            options: ImageProcessOptions(
+              compressEnabled: options.compressEnabled,
+              quality: q,
+              resizeEnabled: options.resizeEnabled,
+              resizeWidth: options.resizeWidth,
+              resizeHeight: options.resizeHeight,
+              keepExif: false,
+              format: OutputFormat.jpg,
+            ),
+            maxSide: maxSide,
+          );
+
+          // Replace original large bytes with the smaller JPG to release memory.
+          _logic.pages[i] = SelectedImage(
+            name: _logic.pages[i].name,
+            bytes: jpgBytes,
+          );
+          jpgBytesByPage.add(jpgBytes);
+
+          processed++;
+          if (mounted && (processed == totalPages || processed % 2 == 0)) {
+            setState(() {
+              _saveDone = processed;
+            });
+            if (!kIsWeb) {
+              try {
+                unawaited(
+                  _progressChannel.invokeMethod('update', {
+                    'done': processed,
+                    'total': totalPages,
+                    'title': 'Saving PDF',
+                  }),
+                );
+              } catch (_) {}
+            }
+          }
+          if (processed % 2 == 0) {
+            await Future<void>.delayed(Duration.zero);
+          }
+        }
+
+        final pdfBytes = await _pdfExportService.buildPdfFromJpgBytesInIsolate(
+          jpgBytesByPage: jpgBytesByPage,
+        );
+
+        final fileName = parts <= 1
+            ? 'PDF_$stamp.pdf'
+            : 'PDF_${stamp}_part${part + 1}of$parts.pdf';
+
+        await _outputStorageService.saveBytes(
+          fileName: fileName,
+          bytes: pdfBytes,
+        );
+
+        await Future<void>.delayed(Duration.zero);
       }
 
-      final pdfBytes = await _pdfExportService.buildPdfPerPage(
-        images: _logic.pages,
-        optionsByPage: options,
-      );
-
-      final stamp = _timestamp();
-      final fileName = 'PDF_$stamp.pdf';
-      final saved = await _outputStorageService.saveBytes(
-        fileName: fileName,
-        bytes: pdfBytes,
-      );
-
-      final ok = await _gallerySaveService.saveFile(filePath: saved.path);
       if (!mounted) return;
-      if (!ok) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'PDF saved in Result Folder. Gallery save supports images only.',
-            ),
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            parts <= 1
+                ? 'PDF saved in Result Folder. Gallery save supports images only.'
+                : 'Saved $parts PDF parts in Result Folder.',
           ),
-        );
+        ),
+      );
+
+      if (!kIsWeb) {
+        try {
+          unawaited(
+            _progressChannel.invokeMethod('complete', {
+              'title': 'Process completed',
+              'body': 'Tap to see results',
+            }),
+          );
+        } catch (_) {}
       }
 
       Navigator.of(
@@ -266,6 +364,11 @@ class _PdfPagesEditorState extends State<PdfPagesEditor> {
     } catch (e, st) {
       debugPrint('PDF save failed: $e');
       debugPrint('$st');
+      if (!kIsWeb) {
+        try {
+          unawaited(_progressChannel.invokeMethod('cancel'));
+        } catch (_) {}
+      }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -830,7 +933,9 @@ class _PdfPagesEditorState extends State<PdfPagesEditor> {
                       label: FittedBox(
                         fit: BoxFit.scaleDown,
                         child: Text(
-                          _isSaving ? 'Saving' : 'Save PDF',
+                          _isSaving && _saveTotal > 0
+                              ? 'Saving ${_saveDone.clamp(0, _saveTotal)}/$_saveTotal'
+                              : (_isSaving ? 'Saving' : 'Save PDF'),
                           style: const TextStyle(fontWeight: FontWeight.w800),
                         ),
                       ),

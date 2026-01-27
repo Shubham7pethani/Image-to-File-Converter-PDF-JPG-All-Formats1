@@ -1,0 +1,62 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <application>
+        <activity
+            android:name="com.sholo.imageconverter.MainActivity"
+            tools:node="merge">
+            <intent-filter tools:node="remove">
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+
+        <activity-alias
+            android:name="com.sholo.imageconverter.LauncherDefault"
+            android:enabled="true"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher"
+            android:targetActivity="com.sholo.imageconverter.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name="com.sholo.imageconverter.LauncherJan"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_jan"
+            android:targetActivity="com.sholo.imageconverter.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name="com.sholo.imageconverter.LauncherFeb"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_feb"
+            android:targetActivity="com.sholo.imageconverter.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name="com.sholo.imageconverter.LauncherMar"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_mar"
+            android:targetActivity="com.sholo.imageconverter.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity-alias>
+    </application>
+</manifest>

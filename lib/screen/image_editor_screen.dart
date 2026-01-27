@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image/image.dart' as img;
 import 'crop_image_screen.dart';
 import '../services/app_settings.dart';
@@ -19,6 +20,34 @@ List<int> _decodeImageSize(Uint8List bytes) {
     return <int>[decoded.width, decoded.height];
   } catch (_) {
     return const [0, 0];
+  }
+}
+
+class _AsyncSemaphore {
+  _AsyncSemaphore(this._permits);
+
+  int _permits;
+  final List<Completer<void>> _waiters = <Completer<void>>[];
+
+  Future<void> acquire() {
+    if (_permits > 0) {
+      _permits--;
+      return Future<void>.value();
+    }
+    final c = Completer<void>();
+    _waiters.add(c);
+    return c.future;
+  }
+
+  void release() {
+    if (_waiters.isNotEmpty) {
+      final c = _waiters.removeAt(0);
+      if (!c.isCompleted) {
+        c.complete();
+      }
+      return;
+    }
+    _permits++;
   }
 }
 
@@ -42,6 +71,10 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
       const OutputStorageService();
   final GallerySaveService _gallerySaveService = const GallerySaveService();
   final AppSettings _settings = const AppSettings();
+
+  static const MethodChannel _progressChannel = MethodChannel(
+    'com.sholo.imageconverter/progress_notification',
+  );
 
   final ScrollController _scrollController = ScrollController();
   late final PdfExportService _pdfExportService = PdfExportService(
@@ -81,6 +114,9 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
   bool _previewDirty = true;
   bool _isSaving = false;
 
+  int _saveDone = 0;
+  int _saveTotal = 0;
+
   bool _photoSpeedUp = false;
 
   _EditorStage _stage = _EditorStage.edit;
@@ -113,6 +149,105 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
       return _detectInputFormat(imgItem.name);
     }
     return choice.format;
+  }
+
+  Future<void> _saveAllConcurrent({required bool requirePreviews}) async {
+    final baseStamp = _timestamp();
+    final total = _images.length;
+    if (total <= 0) return;
+
+    if (mounted) {
+      setState(() {
+        _saveDone = 0;
+        _saveTotal = total;
+      });
+    }
+
+    final sem = _AsyncSemaphore(2);
+    var completed = 0;
+    final tasks = <Future<void>>[];
+
+    for (var i = 0; i < total; i++) {
+      await sem.acquire();
+      tasks.add(() async {
+        try {
+          OutputFormat saveFormat;
+          Uint8List bytesToSave;
+
+          if (requirePreviews) {
+            final out = _previewByIndex[i];
+            if (out == null) {
+              throw StateError('Missing preview for image ${i + 1}');
+            }
+            if (out.saveFormat == OutputFormat.pdf) {
+              throw StateError('PDF is available for single image only.');
+            }
+            saveFormat = out.saveFormat;
+            bytesToSave =
+                out.saveBytes ??
+                await _encodeFinalImageBytes(
+                  image: _images[i],
+                  options: _optionsForIndex(index: i, format: out.saveFormat),
+                  canPreserveExif:
+                      _optionsForIndex(
+                        index: i,
+                        format: out.saveFormat,
+                      ).keepExif &&
+                      !_cropped,
+                );
+          } else {
+            final effectiveFormat = _effectiveFormatForIndex(i);
+            if (effectiveFormat == OutputFormat.pdf) {
+              throw StateError('PDF is available for single image only.');
+            }
+            saveFormat = effectiveFormat;
+            final options = _optionsForIndex(index: i, format: effectiveFormat);
+            bytesToSave = await _encodeFinalImageBytes(
+              image: _images[i],
+              options: options,
+              canPreserveExif:
+                  options.keepExif &&
+                  !_cropped &&
+                  effectiveFormat != OutputFormat.pdf,
+            );
+          }
+
+          final label = _formatLabel(saveFormat);
+          final ext = _formatExt(saveFormat);
+          final fileName = '${label}_${baseStamp}_${i + 1}.$ext';
+
+          await _outputStorageService.saveBytes(
+            fileName: fileName,
+            bytes: bytesToSave,
+          );
+          await _gallerySaveService.saveImage(
+            bytes: bytesToSave,
+            name: fileName,
+          );
+        } finally {
+          sem.release();
+          completed++;
+          if (mounted && (completed == total || completed % 5 == 0)) {
+            setState(() {
+              _saveDone = completed;
+            });
+            if (!kIsWeb) {
+              try {
+                unawaited(
+                  _progressChannel.invokeMethod('update', {
+                    'done': completed,
+                    'total': total,
+                    'title': 'Saving',
+                  }),
+                );
+              } catch (_) {}
+            }
+          }
+        }
+      }());
+    }
+
+    await Future.wait(tasks);
   }
 
   Future<_PreviewOut> _buildPreviewOnly() async {
@@ -302,36 +437,37 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
 
     setState(() {
       _isSaving = true;
+      _saveDone = 0;
+      _saveTotal = _images.length;
     });
+
+    if (!kIsWeb) {
+      try {
+        unawaited(
+          _progressChannel.invokeMethod('start', {
+            'total': _images.length,
+            'title': 'Saving',
+          }),
+        );
+      } catch (_) {}
+    }
 
     await Future<void>.delayed(Duration.zero);
     await WidgetsBinding.instance.endOfFrame;
     if (!mounted) return;
 
     try {
-      final baseStamp = _timestamp();
-      for (var i = 0; i < _images.length; i++) {
-        final effectiveFormat = _effectiveFormatForIndex(i);
-        if (effectiveFormat == OutputFormat.pdf) {
-          throw StateError('PDF is available for single image only.');
-        }
+      await _saveAllConcurrent(requirePreviews: false);
 
-        final options = _optionsForIndex(index: i, format: effectiveFormat);
-        final bytes = await _encodeFinalImageBytes(
-          image: _images[i],
-          options: options,
-          canPreserveExif:
-              options.keepExif &&
-              !_cropped &&
-              effectiveFormat != OutputFormat.pdf,
-        );
-
-        final label = _formatLabel(effectiveFormat);
-        final ext = _formatExt(effectiveFormat);
-        final fileName = '${label}_${baseStamp}_${i + 1}.$ext';
-
-        await _outputStorageService.saveBytes(fileName: fileName, bytes: bytes);
-        await _gallerySaveService.saveImage(bytes: bytes, name: fileName);
+      if (!kIsWeb) {
+        try {
+          unawaited(
+            _progressChannel.invokeMethod('complete', {
+              'title': 'Process completed',
+              'body': 'Tap to see results',
+            }),
+          );
+        } catch (_) {}
       }
 
       if (!mounted) return;
@@ -341,6 +477,11 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
     } catch (e, st) {
       debugPrint('Save all failed: $e');
       debugPrint('$st');
+      if (!kIsWeb) {
+        try {
+          unawaited(_progressChannel.invokeMethod('cancel'));
+        } catch (_) {}
+      }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -434,37 +575,13 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
   }
 
   Future<void> _saveAllImages() async {
-    final baseStamp = _timestamp();
-    for (var i = 0; i < _images.length; i++) {
-      final out = _previewByIndex[i];
-      if (out == null) {
-        throw StateError('Missing preview for image ${i + 1}');
-      }
-
-      if (out.saveFormat == OutputFormat.pdf) {
-        throw StateError('PDF is available for single image only.');
-      }
-
-      final bytesToSave =
-          out.saveBytes ??
-          await _encodeFinalImageBytes(
-            image: _images[i],
-            options: _optionsForIndex(index: i, format: out.saveFormat),
-            canPreserveExif:
-                _optionsForIndex(index: i, format: out.saveFormat).keepExif &&
-                !_cropped,
-          );
-
-      final label = _formatLabel(out.saveFormat);
-      final ext = _formatExt(out.saveFormat);
-      final fileName = '${label}_${baseStamp}_${i + 1}.$ext';
-
-      await _outputStorageService.saveBytes(
-        fileName: fileName,
-        bytes: bytesToSave,
-      );
-      await _gallerySaveService.saveImage(bytes: bytesToSave, name: fileName);
+    if (mounted) {
+      setState(() {
+        _saveDone = 0;
+        _saveTotal = _images.length;
+      });
     }
+    await _saveAllConcurrent(requirePreviews: true);
   }
 
   void _saveActiveDimsFromControllers() {
@@ -1177,53 +1294,88 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
               ],
               const Spacer(),
               if (_isMultiSession && _stage == _EditorStage.edit) ...[
-                SizedBox(
-                  height: 44,
-                  child: ElevatedButton.icon(
-                    onPressed: _isSaving ? null : _onDone,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: ImageEditorScreen.gold,
-                      foregroundColor: Colors.black,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
+                if (_isSaving && _saveTotal > 0)
+                  SizedBox(
+                    height: 44,
+                    child: ElevatedButton.icon(
+                      onPressed: null,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF1F1D2F),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          side: const BorderSide(color: Color(0x38E2C078)),
+                        ),
+                      ),
+                      icon: const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      ),
+                      label: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          '${_saveDone.clamp(0, _saveTotal)}/$_saveTotal',
+                          style: const TextStyle(fontWeight: FontWeight.w800),
+                        ),
                       ),
                     ),
-                    icon: _isSaving
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.black,
-                            ),
-                          )
-                        : const Icon(Icons.check),
-                    label: const Text(
-                      'Save',
-                      style: TextStyle(fontWeight: FontWeight.w800),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                SizedBox(
-                  height: 44,
-                  child: ElevatedButton.icon(
-                    onPressed: _isSaving ? null : _onSaveAll,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF1F1D2F),
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        side: const BorderSide(color: Color(0x38E2C078)),
+                  )
+                else ...[
+                  SizedBox(
+                    height: 44,
+                    child: ElevatedButton.icon(
+                      onPressed: _isSaving ? null : _onDone,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: ImageEditorScreen.gold,
+                        foregroundColor: Colors.black,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      icon: _isSaving
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.black,
+                              ),
+                            )
+                          : const Icon(Icons.check),
+                      label: const Text(
+                        'Save',
+                        style: TextStyle(fontWeight: FontWeight.w800),
                       ),
                     ),
-                    icon: const Icon(Icons.done_all),
-                    label: const Text(
-                      'Save All',
-                      style: TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(width: 10),
+                  SizedBox(
+                    height: 44,
+                    child: ElevatedButton.icon(
+                      onPressed: _isSaving ? null : _onSaveAll,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF1F1D2F),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          side: const BorderSide(color: Color(0x38E2C078)),
+                        ),
+                      ),
+                      icon: const Icon(Icons.done_all),
+                      label: const FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          'Save All',
+                          style: TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                ],
               ] else
                 SizedBox(
                   height: 44,
@@ -1246,15 +1398,20 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
                             ),
                           )
                         : const Icon(Icons.check),
-                    label: Text(
-                      _isSaving
-                          ? 'Saving'
-                          : (_stage == _EditorStage.previewOne
-                                ? 'Save'
-                                : (_stage == _EditorStage.previewAll
-                                      ? 'Save All'
-                                      : (_isMulti ? 'Save' : 'Done'))),
-                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    label: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        _isSaving
+                            ? (_saveTotal > 0
+                                  ? 'Saving ${_saveDone.clamp(0, _saveTotal)}/$_saveTotal'
+                                  : 'Saving')
+                            : (_stage == _EditorStage.previewOne
+                                  ? 'Save'
+                                  : (_stage == _EditorStage.previewAll
+                                        ? 'Save All'
+                                        : (_isMulti ? 'Save' : 'Done'))),
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
                     ),
                   ),
                 ),
@@ -1269,10 +1426,12 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
             children: [
               if (_images.length > 1 && _stage == _EditorStage.edit) ...[
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: List.generate(_images.length, (i) {
+                SizedBox(
+                  height: 40,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: _images.length,
+                    itemBuilder: (context, i) {
                       final selected = i == _activeIndex;
                       return Padding(
                         padding: EdgeInsets.only(
@@ -1291,7 +1450,7 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
                           onSelected: (_) => _setActiveIndex(i),
                         ),
                       );
-                    }),
+                    },
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -1870,8 +2029,9 @@ class _PreviewCard extends StatelessWidget {
                     : Image.memory(
                         bytes!,
                         fit: BoxFit.contain,
-                        cacheWidth: 900,
-                        cacheHeight: 900,
+                        filterQuality: FilterQuality.low,
+                        cacheWidth: 600,
+                        cacheHeight: 600,
                       ),
               ),
             ),

@@ -25,6 +25,8 @@ class _ChoosePhotoScreenState extends State<ChoosePhotoScreen> {
   final AppSettings _settings = const AppSettings();
   bool _isLoading = false;
 
+  static const int _maxMultiImages = 150;
+
   List<SelectedImage> _dedupeImages(List<SelectedImage> images) {
     final seen = <String>{};
     final out = <SelectedImage>[];
@@ -113,12 +115,25 @@ class _ChoosePhotoScreenState extends State<ChoosePhotoScreen> {
   Future<void> _pickFromGallery() async {
     await _withLoader(() async {
       if (widget.allowMultiple) {
-        final files = await _picker.pickMultiImage();
+        final files = await _picker.pickMultiImage(limit: _maxMultiImages);
         if (!mounted) return;
         if (files.isEmpty) return;
+
+        final cappedFiles = files.length > _maxMultiImages
+            ? files.take(_maxMultiImages).toList()
+            : files;
+
+        if (files.length > _maxMultiImages) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Selected more than 150 images. Using first 150.'),
+            ),
+          );
+        }
+
         final images = <SelectedImage>[];
         var i = 0;
-        for (final f in files) {
+        for (final f in cappedFiles) {
           images.add(SelectedImage(name: f.name, bytes: await f.readAsBytes()));
           i++;
           if (i % 2 == 0) {
@@ -161,6 +176,20 @@ class _ChoosePhotoScreenState extends State<ChoosePhotoScreen> {
         if (i % 8 == 0) {
           await Future<void>.delayed(Duration.zero);
         }
+      }
+
+      if (widget.allowMultiple && images.length > _maxMultiImages) {
+        final capped = images.take(_maxMultiImages).toList();
+        images
+          ..clear()
+          ..addAll(capped);
+
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Selected more than 150 images. Using first 150.'),
+          ),
+        );
       }
 
       if (images.isEmpty) {

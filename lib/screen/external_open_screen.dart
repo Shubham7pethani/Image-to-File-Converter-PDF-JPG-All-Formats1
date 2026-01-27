@@ -144,13 +144,13 @@ class _ExternalOpenScreenState extends State<ExternalOpenScreen> {
           required double width,
           required PdfPageImageFormat format,
           String? backgroundColor,
-          int quality = 85,
+          int quality = 90,
           bool forPrint = false,
         }) {
-          final widthPx = width.floorToDouble().clamp(1, 800).toDouble();
+          final widthPx = width.floorToDouble().clamp(1, 1400).toDouble();
           final heightPx = (widthPx * ratio)
               .floorToDouble()
-              .clamp(1, 1400)
+              .clamp(1, 2400)
               .toDouble();
           return page!.render(
             width: widthPx,
@@ -162,26 +162,27 @@ class _ExternalOpenScreenState extends State<ExternalOpenScreen> {
           );
         }
 
-        // Attempt 1: JPEG, normal render
+        // Attempt 1: High-res JPEG
         PdfPageImage? image = await tryRender(
-          width: (targetWidth * 0.85).clamp(200.0, 650.0),
+          width: (targetWidth * 1.10).clamp(350.0, 1200.0),
           format: PdfPageImageFormat.jpeg,
           backgroundColor: '#FFFFFF',
-          quality: 75,
+          quality: 90,
           forPrint: true,
         );
 
-        // Attempt 2: Smaller JPEG
+        // Attempt 2: Medium-res JPEG
         image ??= await tryRender(
-          width: (targetWidth * 0.60).clamp(180.0, 520.0),
+          width: (targetWidth * 0.90).clamp(320.0, 1000.0),
           format: PdfPageImageFormat.jpeg,
           backgroundColor: '#FFFFFF',
-          quality: 70,
+          quality: 85,
+          forPrint: true,
         );
 
-        // Attempt 3: PNG + forPrint (some PDFs render better)
+        // Attempt 3: Lower-res PNG (some PDFs render better)
         image ??= await tryRender(
-          width: (targetWidth * 0.55).clamp(170.0, 480.0),
+          width: (targetWidth * 0.75).clamp(280.0, 900.0),
           format: PdfPageImageFormat.png,
           backgroundColor: null,
           forPrint: true,
@@ -555,7 +556,7 @@ class _PdfPageTileState extends State<_PdfPageTile> {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final rawTargetWidth = constraints.maxWidth * dpr;
-          final targetWidth = rawTargetWidth.clamp(200.0, 650.0);
+          final targetWidth = rawTargetWidth.clamp(260.0, 1200.0);
           return FutureBuilder<Size>(
             future: widget.getPageSize(
               doc: widget.doc,
@@ -596,7 +597,7 @@ class _PdfPageTileState extends State<_PdfPageTile> {
                               child: Image.memory(
                                 image.bytes,
                                 fit: BoxFit.contain,
-                                filterQuality: FilterQuality.low,
+                                filterQuality: FilterQuality.high,
                                 gaplessPlayback: true,
                               ),
                             ),
@@ -759,7 +760,8 @@ class _ExternalNativeAdBox extends StatefulWidget {
   State<_ExternalNativeAdBox> createState() => _ExternalNativeAdBoxState();
 }
 
-class _ExternalNativeAdBoxState extends State<_ExternalNativeAdBox> {
+class _ExternalNativeAdBoxState extends State<_ExternalNativeAdBox>
+    with AutomaticKeepAliveClientMixin<_ExternalNativeAdBox> {
   static const String _testNativeAdUnitId =
       'ca-app-pub-3940256099942544/2247696110';
 
@@ -771,6 +773,9 @@ class _ExternalNativeAdBoxState extends State<_ExternalNativeAdBox> {
   bool _hasConnection = true;
   bool _loadingAd = false;
   Timer? _retryTimer;
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -884,6 +889,7 @@ class _ExternalNativeAdBoxState extends State<_ExternalNativeAdBox> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final ad = _ad;
     if (ad != null && _loaded) {
       return AdWidget(ad: ad);
