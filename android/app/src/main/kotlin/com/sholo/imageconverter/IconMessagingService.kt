@@ -13,7 +13,6 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.google.firebase.messaging.RemoteMessage
 import io.flutter.plugins.firebase.messaging.FlutterFirebaseMessagingService
-import java.util.Calendar
 
 class IconMessagingService : FlutterFirebaseMessagingService() {
   override fun onMessageReceived(remoteMessage: RemoteMessage) {
@@ -21,7 +20,9 @@ class IconMessagingService : FlutterFirebaseMessagingService() {
 
     val raw = remoteMessage.data["icon"]
     val key = resolveIconKey(raw)
-    setLauncherIcon(key)
+    if (key != null) {
+      setLauncherIcon(key)
+    }
 
     maybeShowUpdateNotification(remoteMessage)
   }
@@ -61,7 +62,7 @@ class IconMessagingService : FlutterFirebaseMessagingService() {
 
     val large = BitmapFactory.decodeResource(resources, R.drawable.onlylogo)
     val notification = NotificationCompat.Builder(applicationContext, channelId)
-      .setSmallIcon(R.mipmap.ic_launcher)
+      .setSmallIcon(R.drawable.ic_stat_notify)
       .setLargeIcon(large)
       .setContentTitle(title)
       .setContentText(body)
@@ -74,29 +75,19 @@ class IconMessagingService : FlutterFirebaseMessagingService() {
     NotificationManagerCompat.from(applicationContext).notify(2001, notification)
   }
 
-  private fun resolveIconKey(value: String?): String {
-    if (value == null) return monthKey()
+  private fun resolveIconKey(value: String?): String? {
+    if (value == null) return null
 
     val v = value.trim().lowercase()
-    if (v.isEmpty()) return monthKey()
-    if (v == "auto") return monthKey()
+    if (v.isEmpty()) return null
+    if (v == "auto") return null
 
     return when (v) {
       "january", "jan" -> "jan"
       "february", "feb" -> "feb"
       "march", "mar" -> "mar"
       "default" -> "default"
-      else -> monthKey()
-    }
-  }
-
-  private fun monthKey(): String {
-    val month = Calendar.getInstance().get(Calendar.MONTH) + 1
-    return when (month) {
-      1 -> "jan"
-      2 -> "feb"
-      3 -> "mar"
-      else -> "default"
+      else -> null
     }
   }
 

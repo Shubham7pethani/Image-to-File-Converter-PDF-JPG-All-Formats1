@@ -105,7 +105,8 @@ class MainActivity : FlutterActivity() {
         "start" -> {
           val total = call.argument<Int>("total") ?: 0
           val title = call.argument<String>("title")
-          startOrUpdateSaveService(done = 0, total = total, title = title)
+          val body = call.argument<String>("body")
+          startOrUpdateSaveService(done = 0, total = total, title = title, body = body)
           result.success(true)
           return@setMethodCallHandler
         }
@@ -113,7 +114,8 @@ class MainActivity : FlutterActivity() {
           val done = call.argument<Int>("done") ?: 0
           val total = call.argument<Int>("total") ?: 0
           val title = call.argument<String>("title")
-          startOrUpdateSaveService(done = done, total = total, title = title)
+          val body = call.argument<String>("body")
+          startOrUpdateSaveService(done = done, total = total, title = title, body = body)
           result.success(true)
           return@setMethodCallHandler
         }
@@ -211,12 +213,13 @@ class MainActivity : FlutterActivity() {
     nm?.createNotificationChannel(channel)
   }
 
-  private fun startOrUpdateSaveService(done: Int, total: Int, title: String?) {
+  private fun startOrUpdateSaveService(done: Int, total: Int, title: String?, body: String?) {
     val intent = Intent(this, SaveForegroundService::class.java).apply {
       action = if (done <= 0) SaveForegroundService.ACTION_START else SaveForegroundService.ACTION_UPDATE
       putExtra(SaveForegroundService.EXTRA_DONE, done)
       putExtra(SaveForegroundService.EXTRA_TOTAL, total)
       if (!title.isNullOrEmpty()) putExtra(SaveForegroundService.EXTRA_TITLE, title)
+      if (!body.isNullOrEmpty()) putExtra(SaveForegroundService.EXTRA_BODY, body)
     }
 
     ContextCompat.startForegroundService(this, intent)
@@ -255,7 +258,7 @@ class MainActivity : FlutterActivity() {
     val shownBody = if (safeTotal > 0) "${safeDone.coerceAtMost(safeTotal)}/$safeTotal" else "Working"
 
     val builder = NotificationCompat.Builder(this, channelId)
-      .setSmallIcon(R.drawable.onlylogo)
+      .setSmallIcon(R.drawable.ic_stat_notify)
       .setContentTitle(shownTitle)
       .setContentText(shownBody)
       .setOnlyAlertOnce(true)
@@ -288,7 +291,7 @@ class MainActivity : FlutterActivity() {
     val pending = PendingIntent.getActivity(this, 3002, intent, pendingFlags)
 
     val notification = NotificationCompat.Builder(this, channelId)
-      .setSmallIcon(R.drawable.onlylogo)
+      .setSmallIcon(R.drawable.ic_stat_notify)
       .setContentTitle(title?.takeIf { it.isNotBlank() } ?: "Completed")
       .setContentText(body?.takeIf { it.isNotBlank() } ?: "Tap to see results")
       .setAutoCancel(true)

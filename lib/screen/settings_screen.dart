@@ -86,7 +86,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _photoSpeedUp = prefs.getBool(AppSettings.prefPhotoSpeedUp) ?? false;
       _preventDuplicates =
           prefs.getBool(AppSettings.prefPreventDuplicates) ?? true;
-      _versionLabel = 'v${info.version}+${info.buildNumber}';
+      _versionLabel = 'v${info.version}';
       _packageName = info.packageName;
       _loading = false;
     });

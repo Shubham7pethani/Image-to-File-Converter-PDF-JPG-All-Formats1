@@ -241,6 +241,7 @@ class _PdfPagesEditorState extends State<PdfPagesEditor> {
           _progressChannel.invokeMethod('start', {
             'total': _logic.pages.length,
             'title': 'Saving PDF',
+            'body': 'You can use other apps while this is processing',
           }),
         );
       } catch (_) {}
@@ -310,6 +311,7 @@ class _PdfPagesEditorState extends State<PdfPagesEditor> {
                     'done': processed,
                     'total': totalPages,
                     'title': 'Saving PDF',
+                    'body': 'You can use other apps while this is processing',
                   }),
                 );
               } catch (_) {}

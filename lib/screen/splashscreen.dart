@@ -44,7 +44,7 @@ class _SplashScreenState extends State<SplashScreen> {
       final info = await PackageInfo.fromPlatform().timeout(
         const Duration(seconds: 1),
       );
-      final versionLabel = 'v${info.version}+${info.buildNumber}';
+      final versionLabel = 'v${info.version}';
       final patchLabel = await _updateService.readCurrentPatchLabel();
       if (!mounted) return;
       setState(() {

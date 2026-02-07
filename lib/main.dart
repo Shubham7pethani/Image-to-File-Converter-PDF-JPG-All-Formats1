@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
@@ -12,7 +14,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'services/external_open_service.dart';
-import 'screen/splashscreen.dart';
+import 'services/update_service.dart';
 import 'screen/home_screen.dart';
 import 'screen/multiple_images_screen.dart';
 import 'screen/privacy_policy_screen.dart';
@@ -23,6 +25,7 @@ import 'screen/settings_screen.dart';
 import 'screen/create_pdf_screen.dart';
 import 'screen/star_imp.dart';
 import 'screen/external_open_screen.dart';
+import 'screen/splashscreen.dart';
 
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
@@ -49,27 +52,21 @@ class _MyAppState extends State<MyApp> {
   StreamSubscription<String>? _externalOpenSub;
   String? _pendingRoute;
 
-  static const MethodChannel _routeChannel = MethodChannel(
-    'com.sholo.imageconverter/deeplink',
-  );
+  static const String _testBannerAdUnitId =
+      'ca-app-pub-3940256099942544/6300978111';
 
-  Future<void> _syncLauncherIcon() async {
+  Future<void> _ensureDefaultLauncherIcon() async {
     if (!Platform.isAndroid) return;
 
     const channel = MethodChannel('com.sholo.imageconverter/launcher_icon');
-    final month = DateTime.now().month;
-
-    final key = switch (month) {
-      1 => 'jan',
-      2 => 'feb',
-      3 => 'mar',
-      _ => 'default',
-    };
-
     try {
-      await channel.invokeMethod('setLauncherIcon', {'key': key});
+      await channel.invokeMethod('setLauncherIcon', {'key': 'default'});
     } catch (_) {}
   }
+
+  static const MethodChannel _routeChannel = MethodChannel(
+    'com.sholo.imageconverter/deeplink',
+  );
 
   Future<void> _initDeepLinks() async {
     _routeChannel.setMethodCallHandler((call) async {
@@ -171,10 +168,25 @@ class _MyAppState extends State<MyApp> {
     super.initState();
 
     unawaited(ExternalOpenService.instance.init());
-    unawaited(_syncLauncherIcon());
+    unawaited(_ensureDefaultLauncherIcon());
     unawaited(_checkForUpdates());
     unawaited(_initNotifications());
     unawaited(_initDeepLinks());
+
+    // Handle initial path for files opened while app was closed
+    unawaited(
+      ExternalOpenService.instance.consumeInitialPath().then((path) {
+        if (path != null && path.isNotEmpty) {
+          final nav = _navigatorKey.currentState;
+          if (nav != null) {
+            nav.push(
+              MaterialPageRoute(builder: (_) => ExternalOpenScreen(path: path)),
+            );
+          }
+        }
+      }),
+    );
+
     _externalOpenSub = ExternalOpenService.instance.stream.listen((path) {
       final nav = _navigatorKey.currentState;
       if (nav == null) return;
@@ -197,8 +209,9 @@ class _MyAppState extends State<MyApp> {
       title: 'Image to File Converter – PDF, JPG & All Formats',
       navigatorKey: _navigatorKey,
       builder: (context, child) {
-        return ColoredBox(
-          color: const Color(0xFF1B1E23),
+        return _GlobalBannerScaffold(
+          backgroundColor: const Color(0xFF1B1E23),
+          adUnitId: _testBannerAdUnitId,
           child: child ?? const SizedBox.shrink(),
         );
       },
@@ -245,6 +258,192 @@ class _MyAppState extends State<MyApp> {
         '/report-bugs': (context) => const ReportBugsScreen(),
         '/privacy-policy': (context) => const PrivacyPolicyScreen(),
       },
+    );
+  }
+}
+
+class _GlobalBannerScaffold extends StatefulWidget {
+  const _GlobalBannerScaffold({
+    required this.child,
+    required this.adUnitId,
+    required this.backgroundColor,
+  });
+
+  final Widget child;
+  final String adUnitId;
+  final Color backgroundColor;
+
+  @override
+  State<_GlobalBannerScaffold> createState() => _GlobalBannerScaffoldState();
+}
+
+class _GlobalBannerScaffoldState extends State<_GlobalBannerScaffold> {
+  BannerAd? _bannerAd;
+  bool _loaded = false;
+
+  final Connectivity _connectivity = Connectivity();
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
+  bool _hasConnection = true;
+  bool _loadingAd = false;
+  Timer? _retryTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _initConnectivity();
+  }
+
+  Future<void> _initConnectivity() async {
+    final results = await _connectivity.checkConnectivity();
+    final connected = results.any((r) => r != ConnectivityResult.none);
+    if (!mounted) return;
+    setState(() {
+      _hasConnection = connected;
+    });
+
+    if (_hasConnection) {
+      _loadAd();
+    }
+
+    _connectivitySub = _connectivity.onConnectivityChanged.listen((results) {
+      final isConnected = results.any((r) => r != ConnectivityResult.none);
+      if (!mounted) return;
+
+      if (!isConnected) {
+        _retryTimer?.cancel();
+        _retryTimer = null;
+        _disposeAd();
+        setState(() {
+          _hasConnection = false;
+        });
+        return;
+      }
+
+      final wasConnected = _hasConnection;
+      setState(() {
+        _hasConnection = true;
+      });
+
+      if (!wasConnected && _bannerAd == null) {
+        _loadAd();
+      }
+    });
+  }
+
+  void _disposeAd() {
+    _bannerAd?.dispose();
+    _bannerAd = null;
+    _loaded = false;
+    _loadingAd = false;
+  }
+
+  void _scheduleRetry() {
+    if (!_hasConnection) return;
+    if (_retryTimer != null) return;
+    _retryTimer = Timer(const Duration(seconds: 5), () {
+      _retryTimer = null;
+      if (!mounted) return;
+      if (_bannerAd == null && _hasConnection) {
+        _loadAd();
+      }
+    });
+  }
+
+  void _loadAd() {
+    if (_loadingAd) return;
+    if (!_hasConnection) return;
+    if (_bannerAd != null) return;
+
+    _loadingAd = true;
+    final ad = BannerAd(
+      adUnitId: widget.adUnitId,
+      size: AdSize.banner,
+      request: const AdRequest(),
+      listener: BannerAdListener(
+        onAdLoaded: (ad) {
+          if (!mounted) return;
+          setState(() {
+            _bannerAd = ad as BannerAd;
+            _loaded = true;
+            _loadingAd = false;
+          });
+        },
+        onAdFailedToLoad: (ad, error) {
+          ad.dispose();
+          if (!mounted) return;
+          setState(() {
+            _bannerAd = null;
+            _loaded = false;
+            _loadingAd = false;
+          });
+          _scheduleRetry();
+        },
+      ),
+    );
+
+    _bannerAd = ad;
+    ad.load();
+  }
+
+  @override
+  void didUpdateWidget(covariant _GlobalBannerScaffold oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.adUnitId != widget.adUnitId) {
+      _disposeAd();
+      _loadAd();
+    }
+  }
+
+  @override
+  void dispose() {
+    _retryTimer?.cancel();
+    _retryTimer = null;
+    _connectivitySub?.cancel();
+    _connectivitySub = null;
+    _disposeAd();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ad = _bannerAd;
+    final adHeight = (_loaded && ad != null) ? ad.size.height.toDouble() : 0.0;
+    final bottomInset = MediaQuery.of(context).padding.bottom;
+    final reservedHeight = (_loaded && ad != null)
+        ? (adHeight + bottomInset)
+        : 0.0;
+
+    return ColoredBox(
+      color: widget.backgroundColor,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: Padding(
+              padding: EdgeInsets.only(bottom: reservedHeight),
+              child: widget.child,
+            ),
+          ),
+          if (_loaded && ad != null)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: SizedBox(
+                height: reservedHeight,
+                child: Padding(
+                  padding: EdgeInsets.only(bottom: bottomInset),
+                  child: Center(
+                    child: SizedBox(
+                      width: ad.size.width.toDouble(),
+                      height: adHeight,
+                      child: AdWidget(ad: ad),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
