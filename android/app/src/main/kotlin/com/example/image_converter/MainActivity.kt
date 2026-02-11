@@ -20,6 +20,8 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.google.android.gms.ads.nativead.NativeAd
 import com.google.android.gms.ads.nativead.NativeAdView
+import com.google.android.gms.ads.nativead.AdChoicesView
+import com.google.android.gms.ads.nativead.MediaView
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -403,9 +405,15 @@ private class HomeNativeAdFactory(private val context: Context) :
     val body = adView.findViewById<TextView>(R.id.ad_body)
     val icon = adView.findViewById<ImageView>(R.id.ad_app_icon)
     val cta = adView.findViewById<Button>(R.id.ad_call_to_action)
+    val media = adView.findViewById<MediaView>(R.id.ad_media)
+    val adChoices = adView.findViewById<AdChoicesView>(R.id.ad_choices_view)
 
     headline.text = nativeAd.headline
     adView.headlineView = headline
+
+    adView.mediaView = media
+
+    adView.adChoicesView = adChoices
 
     if (nativeAd.body == null) {
       body.visibility = View.GONE

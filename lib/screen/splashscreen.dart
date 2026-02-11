@@ -23,6 +23,7 @@ class _SplashScreenState extends State<SplashScreen> {
   String? _patch;
   String? _error;
   bool _isLoading = true;
+  bool _showOpenSettings = false;
 
   final UpdateService _updateService = UpdateService();
 
@@ -38,36 +39,63 @@ class _SplashScreenState extends State<SplashScreen> {
     setState(() {
       _isLoading = true;
       _error = null;
+      _showOpenSettings = false;
     });
 
     try {
-      final info = await PackageInfo.fromPlatform().timeout(
-        const Duration(seconds: 1),
-      );
-      final versionLabel = 'v${info.version}';
-      final patchLabel = await _updateService.readCurrentPatchLabel();
+      PackageInfo? info;
+      try {
+        info = await PackageInfo.fromPlatform().timeout(
+          const Duration(seconds: 3),
+        );
+      } on Exception {
+        info = null;
+      }
+
+      final versionLabel = info == null ? null : 'v${info.version}';
+      String? patchLabel;
+      try {
+        patchLabel = await _updateService.readCurrentPatchLabel();
+      } on Exception {
+        patchLabel = null;
+      }
+
       if (!mounted) return;
       setState(() {
         _version = versionLabel;
         _patch = patchLabel;
       });
 
-      final decision = await _updateService
-          .checkAndMaybeApplyUpdates(
-            platformIsAndroid:
-                !kIsWeb && defaultTargetPlatform == TargetPlatform.android,
-            allowShorebirdDownload: false,
-          )
-          .timeout(
-            const Duration(seconds: 2),
-            onTimeout: () {
-              return AppUpdateDecision.none;
-            },
-          );
+      AppUpdateDecision decision = AppUpdateDecision.none;
+      try {
+        decision = await _updateService
+            .checkAndMaybeApplyUpdates(
+              platformIsAndroid:
+                  !kIsWeb && defaultTargetPlatform == TargetPlatform.android,
+              allowShorebirdDownload: false,
+            )
+            .timeout(
+              const Duration(seconds: 4),
+              onTimeout: () {
+                return AppUpdateDecision.none;
+              },
+            );
+      } on Exception {
+        decision = AppUpdateDecision.none;
+      }
       if (!mounted) return;
 
       if (decision.mustUpdateFromStore) {
-        final updated = await _tryInAppUpdateOrStore(info.packageName);
+        final packageName = info?.packageName;
+        if (packageName == null || packageName.isEmpty) {
+          setState(() {
+            _isLoading = false;
+            _error = 'Update required to continue.';
+          });
+          return;
+        }
+
+        final updated = await _tryInAppUpdateOrStore(packageName);
         if (!mounted) return;
         if (!updated) {
           setState(() {
@@ -87,13 +115,14 @@ class _SplashScreenState extends State<SplashScreen> {
         return;
       }
 
-      final allowed = await _requestPermissions();
+      final permission = await _requestPermissions();
       if (!mounted) return;
 
-      if (!allowed) {
+      if (!permission.allowed) {
         setState(() {
           _isLoading = false;
           _error = 'Permission required to continue.';
+          _showOpenSettings = permission.openSettings;
         });
         return;
       }
@@ -212,27 +241,49 @@ class _SplashScreenState extends State<SplashScreen> {
     );
   }
 
-  Future<bool> _requestPermissions() async {
+  Future<({bool allowed, bool openSettings})> _requestPermissions() async {
     if (kIsWeb) {
-      return true;
+      return (allowed: true, openSettings: false);
     }
 
     if (defaultTargetPlatform == TargetPlatform.android) {
       final camera = await Permission.camera.request();
       final photos = await Permission.photos.request();
       final storage = await Permission.storage.request();
-      return camera.isGranted && (photos.isGranted || storage.isGranted);
+
+      final allowed =
+          camera.isGranted && (photos.isGranted || storage.isGranted);
+      final openSettings =
+          camera.isPermanentlyDenied ||
+          photos.isPermanentlyDenied ||
+          storage.isPermanentlyDenied ||
+          camera.isRestricted ||
+          photos.isRestricted ||
+          storage.isRestricted;
+
+      return (allowed: allowed, openSettings: openSettings);
     }
 
     if (defaultTargetPlatform == TargetPlatform.iOS) {
       final camera = await Permission.camera.request();
       final photos = await Permission.photos.request();
       final addOnly = await Permission.photosAddOnly.request();
-      return camera.isGranted &&
+
+      final allowed =
+          camera.isGranted &&
           ((photos.isGranted || photos.isLimited) || addOnly.isGranted);
+      final openSettings =
+          camera.isPermanentlyDenied ||
+          photos.isPermanentlyDenied ||
+          addOnly.isPermanentlyDenied ||
+          camera.isRestricted ||
+          photos.isRestricted ||
+          addOnly.isRestricted;
+
+      return (allowed: allowed, openSettings: openSettings);
     }
 
-    return true;
+    return (allowed: true, openSettings: false);
   }
 
   @override
@@ -295,14 +346,15 @@ class _SplashScreenState extends State<SplashScreen> {
                         onPressed: _start,
                         child: const Text('Try Again'),
                       ),
-                      OutlinedButton(
-                        onPressed: openAppSettings,
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.white,
-                          side: const BorderSide(color: Colors.white70),
+                      if (_showOpenSettings)
+                        OutlinedButton(
+                          onPressed: openAppSettings,
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.white,
+                            side: const BorderSide(color: Colors.white70),
+                          ),
+                          child: const Text('Open Settings'),
                         ),
-                        child: const Text('Open Settings'),
-                      ),
                     ],
                   ),
                 ],

@@ -33,6 +33,18 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Enable edge-to-edge display
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      systemNavigationBarColor: Colors.transparent,
+      statusBarColor: Colors.transparent,
+      systemNavigationBarIconBrightness: Brightness.light,
+      statusBarIconBrightness: Brightness.light,
+    ),
+  );
+
   await Firebase.initializeApp();
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   runApp(const MyApp());
@@ -53,7 +65,7 @@ class _MyAppState extends State<MyApp> {
   String? _pendingRoute;
 
   static const String _testBannerAdUnitId =
-      'ca-app-pub-3940256099942544/6300978111';
+      'ca-app-pub-3645213065759243/8959837355';
 
   Future<void> _ensureDefaultLauncherIcon() async {
     if (!Platform.isAndroid) return;
@@ -172,20 +184,6 @@ class _MyAppState extends State<MyApp> {
     unawaited(_checkForUpdates());
     unawaited(_initNotifications());
     unawaited(_initDeepLinks());
-
-    // Handle initial path for files opened while app was closed
-    unawaited(
-      ExternalOpenService.instance.consumeInitialPath().then((path) {
-        if (path != null && path.isNotEmpty) {
-          final nav = _navigatorKey.currentState;
-          if (nav != null) {
-            nav.push(
-              MaterialPageRoute(builder: (_) => ExternalOpenScreen(path: path)),
-            );
-          }
-        }
-      }),
-    );
 
     _externalOpenSub = ExternalOpenService.instance.stream.listen((path) {
       final nav = _navigatorKey.currentState;
@@ -413,6 +411,9 @@ class _GlobalBannerScaffoldState extends State<_GlobalBannerScaffold> {
         ? (adHeight + bottomInset)
         : 0.0;
 
+    final mq = MediaQuery.of(context);
+    final adShowing = _loaded && ad != null;
+
     return ColoredBox(
       color: widget.backgroundColor,
       child: Stack(
@@ -420,10 +421,18 @@ class _GlobalBannerScaffoldState extends State<_GlobalBannerScaffold> {
           Positioned.fill(
             child: Padding(
               padding: EdgeInsets.only(bottom: reservedHeight),
-              child: widget.child,
+              child: MediaQuery(
+                data: adShowing
+                    ? mq.copyWith(
+                        padding: mq.padding.copyWith(bottom: 0),
+                        viewPadding: mq.viewPadding.copyWith(bottom: 0),
+                      )
+                    : mq,
+                child: widget.child,
+              ),
             ),
           ),
-          if (_loaded && ad != null)
+          if (adShowing)
             Positioned(
               left: 0,
               right: 0,

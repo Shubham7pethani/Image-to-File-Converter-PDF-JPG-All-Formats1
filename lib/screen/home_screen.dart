@@ -139,14 +139,20 @@ class _HomeScreenState extends State<HomeScreen> {
             onTap: () => Navigator.of(context).pushNamed('/results'),
           ),
           const SizedBox(height: 20),
-          Container(
-            height: 240,
-            decoration: BoxDecoration(
-              color: HomeScreen._card,
-              borderRadius: BorderRadius.circular(18),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: const _HomeNativeAdBox(),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final w = constraints.maxWidth;
+              final h = (w * 0.82).clamp(290.0, 380.0);
+              return Container(
+                height: h,
+                decoration: BoxDecoration(
+                  color: HomeScreen._card,
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: const _HomeNativeAdBox(),
+              );
+            },
           ),
         ],
       ),
@@ -161,9 +167,10 @@ class _HomeNativeAdBox extends StatefulWidget {
   State<_HomeNativeAdBox> createState() => _HomeNativeAdBoxState();
 }
 
-class _HomeNativeAdBoxState extends State<_HomeNativeAdBox> {
+class _HomeNativeAdBoxState extends State<_HomeNativeAdBox>
+    with WidgetsBindingObserver {
   static const String _testNativeAdUnitId =
-      'ca-app-pub-3940256099942544/2247696110';
+      'ca-app-pub-3645213065759243/6086262009';
 
   NativeAd? _ad;
   bool _loaded = false;
@@ -177,7 +184,17 @@ class _HomeNativeAdBoxState extends State<_HomeNativeAdBox> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _initConnectivity();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) {
+      _stopRefreshTimer();
+    } else if (state == AppLifecycleState.resumed) {
+      _startRefreshTimer();
+    }
   }
 
   Future<void> _initConnectivity() async {
@@ -197,9 +214,10 @@ class _HomeNativeAdBoxState extends State<_HomeNativeAdBox> {
       if (!mounted) return;
 
       if (!isConnected) {
+        debugPrint('Connectivity Lost: Keeping current ad if exists.');
         _retryTimer?.cancel();
         _retryTimer = null;
-        _disposeAd();
+        _stopRefreshTimer();
         setState(() {
           _hasConnection = false;
         });
@@ -224,6 +242,22 @@ class _HomeNativeAdBoxState extends State<_HomeNativeAdBox> {
     _loadingAd = false;
   }
 
+  Timer? _refreshTimer;
+
+  void _startRefreshTimer() {
+    _refreshTimer?.cancel();
+    if (!_hasConnection) return;
+    // Increased to 90s for better stability with AdMob
+    _refreshTimer = Timer.periodic(const Duration(seconds: 90), (timer) {
+      _loadAd(force: true);
+    });
+  }
+
+  void _stopRefreshTimer() {
+    _refreshTimer?.cancel();
+    _refreshTimer = null;
+  }
+
   void _scheduleRetry() {
     if (!_hasConnection) return;
     if (_retryTimer != null) return;
@@ -236,10 +270,10 @@ class _HomeNativeAdBoxState extends State<_HomeNativeAdBox> {
     });
   }
 
-  void _loadAd() {
+  void _loadAd({bool force = false}) {
     if (_loadingAd) return;
     if (!_hasConnection) return;
-    if (_ad != null) return;
+    if (_ad != null && !force) return;
 
     _loadingAd = true;
     final ad = NativeAd(
@@ -248,25 +282,48 @@ class _HomeNativeAdBoxState extends State<_HomeNativeAdBox> {
       request: const AdRequest(),
       listener: NativeAdListener(
         onAdLoaded: (ad) {
+          debugPrint('Native Ad Loaded: ${ad.adUnitId}');
           if (!mounted) {
             ad.dispose();
             return;
           }
+          final oldAd = _ad;
           setState(() {
             _ad = ad as NativeAd;
             _loaded = true;
             _loadingAd = false;
           });
+
+          // Delay disposal of the old ad significantly to ensure the new one is fully rendered
+          if (oldAd != null && oldAd != ad) {
+            Future.delayed(const Duration(seconds: 15), () {
+              if (mounted) {
+                oldAd.dispose();
+                debugPrint('Old Native Ad Disposed after 15s delay');
+              }
+            });
+          }
+          _startRefreshTimer();
         },
         onAdFailedToLoad: (ad, error) {
+          debugPrint(
+            'Native Ad Failed to Load: ${error.message} (Code: ${error.code})',
+          );
+          if (error.code == 3) {
+            debugPrint(
+              'TIP: No Fill error (Code 3) usually means you need to add your test device ID or wait for AdMob to serve ads.',
+            );
+          }
           ad.dispose();
           if (!mounted) return;
+
           setState(() {
-            _ad = null;
-            _loaded = false;
             _loadingAd = false;
           });
-          _scheduleRetry();
+
+          if (_ad == null) {
+            _scheduleRetry();
+          }
         },
       ),
     );
@@ -276,6 +333,8 @@ class _HomeNativeAdBoxState extends State<_HomeNativeAdBox> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _stopRefreshTimer();
     _retryTimer?.cancel();
     _retryTimer = null;
     _connectivitySub?.cancel();
@@ -288,7 +347,9 @@ class _HomeNativeAdBoxState extends State<_HomeNativeAdBox> {
   Widget build(BuildContext context) {
     final ad = _ad;
     if (ad != null && _loaded) {
-      return AdWidget(ad: ad);
+      return SizedBox.expand(
+        child: AdWidget(key: ValueKey(ad.hashCode), ad: ad),
+      );
     }
 
     return const Center(
