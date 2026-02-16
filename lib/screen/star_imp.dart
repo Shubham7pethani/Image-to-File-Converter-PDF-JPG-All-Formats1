@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:open_filex/open_filex.dart';
 
+import '../language/star_imp_screen_language.dart';
 import '../services/branded_share_service.dart';
 import '../services/gallery_save_service.dart';
 import '../services/important_service.dart';
@@ -103,12 +104,15 @@ class _StarImpScreenState extends State<StarImpScreen> {
   }
 
   Future<void> _downloadToPhone(_ImpItem item) async {
+    final code = Localizations.localeOf(context).languageCode;
     final ok = await _gallerySaveService.saveFile(filePath: item.path);
     if (!mounted) return;
 
     if (ok) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Saved to phone (Gallery).')),
+        SnackBar(
+          content: Text(StarImpScreenLanguage.getSavedToPhoneGallery(code)),
+        ),
       );
       return;
     }
@@ -119,8 +123,8 @@ class _StarImpScreenState extends State<StarImpScreen> {
       SnackBar(
         content: Text(
           isPdf
-              ? 'PDF is saved in Result Folder. Gallery save supports images only.'
-              : 'Failed to save to Gallery. Please allow storage/photos permission.',
+              ? StarImpScreenLanguage.getPdfSavedFolder(code)
+              : StarImpScreenLanguage.getFailedToSaveToGallery(code),
         ),
       ),
     );
@@ -132,6 +136,7 @@ class _StarImpScreenState extends State<StarImpScreen> {
   }
 
   Future<void> _delete(_ImpItem item) async {
+    final code = Localizations.localeOf(context).languageCode;
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -150,13 +155,13 @@ class _StarImpScreenState extends State<StarImpScreen> {
           fontWeight: FontWeight.w600,
           fontSize: 14,
         ),
-        title: const Text('Delete file?'),
+        title: Text(StarImpScreenLanguage.getDeleteFile(code)),
         content: Text(item.name),
         actions: [
           TextButton(
             style: TextButton.styleFrom(foregroundColor: Colors.white70),
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+            child: Text(StarImpScreenLanguage.getCancel(code)),
           ),
           ElevatedButton.icon(
             style: ElevatedButton.styleFrom(
@@ -168,7 +173,7 @@ class _StarImpScreenState extends State<StarImpScreen> {
             ),
             onPressed: () => Navigator.of(context).pop(true),
             icon: const Icon(Icons.delete_outline, size: 18),
-            label: const Text('Delete'),
+            label: Text(StarImpScreenLanguage.getDelete(code)),
           ),
         ],
       ),
@@ -211,15 +216,16 @@ class _StarImpScreenState extends State<StarImpScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final code = Localizations.localeOf(context).languageCode;
     return Scaffold(
       backgroundColor: StarImpScreen._bg,
       appBar: AppBar(
         backgroundColor: StarImpScreen._bg,
         foregroundColor: Colors.white,
         elevation: 0,
-        title: const Text(
-          'Important',
-          style: TextStyle(fontWeight: FontWeight.w800),
+        title: Text(
+          StarImpScreenLanguage.getImportant(code),
+          style: const TextStyle(fontWeight: FontWeight.w800),
         ),
         actions: [
           IconButton(onPressed: _refresh, icon: const Icon(Icons.refresh)),
@@ -243,12 +249,12 @@ class _StarImpScreenState extends State<StarImpScreen> {
                 ),
               )
             else if (_items.isEmpty)
-              const Padding(
-                padding: EdgeInsets.only(top: 24),
+              Padding(
+                padding: const EdgeInsets.only(top: 24),
                 child: Center(
                   child: Text(
-                    'No important files yet.',
-                    style: TextStyle(color: Colors.white70, fontSize: 16),
+                    StarImpScreenLanguage.getNoImportantFiles(code),
+                    style: const TextStyle(color: Colors.white70, fontSize: 16),
                   ),
                 ),
               )
@@ -333,22 +339,24 @@ class _StarImpScreenState extends State<StarImpScreen> {
                             _menuItem(
                               value: 'open',
                               icon: Icons.open_in_new,
-                              label: 'Open',
+                              label: StarImpScreenLanguage.getOpen(code),
                             ),
                             _menuItem(
                               value: 'download',
                               icon: Icons.download,
-                              label: 'Download to Phone',
+                              label: StarImpScreenLanguage.getDownloadToPhone(
+                                code,
+                              ),
                             ),
                             _menuItem(
                               value: 'share',
                               icon: Icons.share,
-                              label: 'Share',
+                              label: StarImpScreenLanguage.getShare(code),
                             ),
                             _menuItem(
                               value: 'delete',
                               icon: Icons.delete_outline,
-                              label: 'Delete',
+                              label: StarImpScreenLanguage.getDelete(code),
                               color: const Color(0xFFFF6B6B),
                             ),
                           ],

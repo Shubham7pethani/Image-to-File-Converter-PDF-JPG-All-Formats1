@@ -7,7 +7,261 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
+import '../language/home_screen_language.dart';
+import '../main.dart';
 import '../services/update_service.dart';
+
+class ConnectivityAdWrapper extends StatefulWidget {
+  const ConnectivityAdWrapper({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  State<ConnectivityAdWrapper> createState() => _ConnectivityAdWrapperState();
+}
+
+class _ConnectivityAdWrapperState extends State<ConnectivityAdWrapper> {
+  final Connectivity _connectivity = Connectivity();
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
+  bool _hasConnection = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _initConnectivity();
+  }
+
+  Future<void> _initConnectivity() async {
+    final results = await _connectivity.checkConnectivity();
+    _updateStatus(results);
+
+    _connectivitySub = _connectivity.onConnectivityChanged.listen(
+      _updateStatus,
+    );
+  }
+
+  void _updateStatus(List<ConnectivityResult> results) {
+    final connected = results.any((r) => r != ConnectivityResult.none);
+    if (mounted && _hasConnection != connected) {
+      setState(() => _hasConnection = connected);
+    }
+  }
+
+  @override
+  void dispose() {
+    _connectivitySub?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _hasConnection ? widget.child : const SizedBox.shrink();
+  }
+}
+
+class NativeAdManager {
+  static final Map<String, NativeAd> _cachedAds = {};
+  static final Set<String> _loadingAds = {};
+  static final String _adUnitId = 'ca-app-pub-3645213065759243/6086262009';
+
+  static NativeAd? getAd(String key) => _cachedAds[key];
+
+  static void preloadAd(String key) {
+    if (_cachedAds.containsKey(key) || _loadingAds.contains(key)) return;
+    _loadingAds.add(key);
+
+    final ad = NativeAd(
+      adUnitId: _adUnitId,
+      factoryId: 'homeNative',
+      request: const AdRequest(),
+      listener: NativeAdListener(
+        onAdLoaded: (ad) {
+          _loadingAds.remove(key);
+          _cachedAds[key] = ad as NativeAd;
+          debugPrint('Native Ad Preloaded for $key');
+        },
+        onAdFailedToLoad: (ad, error) {
+          _loadingAds.remove(key);
+          ad.dispose();
+          debugPrint('Native Ad Preload Failed for $key: ${error.message}');
+        },
+      ),
+    );
+    ad.load();
+  }
+
+  static void disposeAds() {
+    for (final ad in _cachedAds.values) {
+      ad.dispose();
+    }
+    _cachedAds.clear();
+    _loadingAds.clear();
+  }
+}
+
+class NativeAdBox extends StatefulWidget {
+  const NativeAdBox({super.key, required this.adKey});
+
+  final String adKey;
+
+  @override
+  State<NativeAdBox> createState() => _NativeAdBoxState();
+}
+
+class _NativeAdBoxState extends State<NativeAdBox> with WidgetsBindingObserver {
+  NativeAd? _ad;
+  bool _loaded = false;
+
+  final Connectivity _connectivity = Connectivity();
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
+  bool _hasConnection = true;
+  bool _loadingAd = false;
+  Timer? _retryTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _checkAd();
+  }
+
+  void _checkAd() {
+    final cached = NativeAdManager.getAd(widget.adKey);
+    if (cached != null) {
+      setState(() {
+        _ad = cached;
+        _loaded = true;
+      });
+    } else {
+      _initConnectivity();
+    }
+  }
+
+  @override
+  void didUpdateWidget(NativeAdBox oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.adKey != widget.adKey) {
+      _checkAd();
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _ad == null) {
+      _loadAd();
+    }
+  }
+
+  Future<void> _initConnectivity() async {
+    final results = await _connectivity.checkConnectivity();
+    final connected = results.any((r) => r != ConnectivityResult.none);
+    if (!mounted) return;
+    setState(() {
+      _hasConnection = connected;
+    });
+
+    if (_hasConnection && _ad == null) {
+      _loadAd();
+    }
+
+    _connectivitySub = _connectivity.onConnectivityChanged.listen((results) {
+      final isConnected = results.any((r) => r != ConnectivityResult.none);
+      if (!mounted) return;
+
+      if (!isConnected) {
+        _hasConnection = false;
+        return;
+      }
+
+      final wasConnected = _hasConnection;
+      _hasConnection = true;
+
+      if (!wasConnected && _ad == null) {
+        _loadAd();
+      }
+    });
+  }
+
+  void _loadAd() {
+    if (_loadingAd || _ad != null || !_hasConnection) return;
+
+    _loadingAd = true;
+    final ad = NativeAd(
+      adUnitId: NativeAdManager._adUnitId,
+      factoryId: 'homeNative',
+      request: const AdRequest(),
+      listener: NativeAdListener(
+        onAdLoaded: (ad) {
+          if (!mounted) return;
+          setState(() {
+            _ad = ad as NativeAd;
+            _loaded = true;
+            _loadingAd = false;
+          });
+        },
+        onAdFailedToLoad: (ad, error) {
+          ad.dispose();
+          if (!mounted) return;
+          setState(() {
+            _ad = null;
+            _loadingAd = false;
+          });
+          _scheduleRetry();
+        },
+      ),
+    );
+    ad.load();
+  }
+
+  void _scheduleRetry() {
+    if (!_hasConnection || _retryTimer != null) return;
+    _retryTimer = Timer(const Duration(seconds: 10), () {
+      _retryTimer = null;
+      if (mounted && _ad == null) _loadAd();
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _connectivitySub?.cancel();
+    _retryTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ad = _ad;
+    if (!_hasConnection) {
+      return const SizedBox.shrink();
+    }
+    if (ad != null && _loaded) {
+      return AdWidget(key: UniqueKey(), ad: ad);
+    }
+    return const Center(
+      child: SizedBox(
+        width: 56,
+        height: 56,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: Color(0xFFE2C078),
+            borderRadius: BorderRadius.all(Radius.circular(10)),
+          ),
+          child: Center(
+            child: Text(
+              'Ad',
+              style: TextStyle(
+                color: Colors.black,
+                fontWeight: FontWeight.w800,
+                fontSize: 16,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -26,6 +280,16 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     unawaited(_checkForShorebirdPatch());
+
+    // Preload native ads for different screens to avoid conflicts
+    NativeAdManager.preloadAd('home');
+    NativeAdManager.preloadAd('choose');
+    NativeAdManager.preloadAd('pdf');
+
+    // Explicitly enable ads when the home screen is shown
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      GlobalAdController.showAds.value = true;
+    });
   }
 
   Future<void> _checkForShorebirdPatch() async {
@@ -45,14 +309,17 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _showRestartRequiredDialog() async {
+    final code = Localizations.localeOf(context).languageCode;
     await showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Update Ready'),
-          content: const Text(
-            'A new update has been downloaded. Please restart the app to apply it.',
+          title: Text(code == 'hi' ? 'अपडेट तैयार है' : 'Update Ready'),
+          content: Text(
+            code == 'hi'
+                ? 'एक नया अपडेट डाउनलोड किया गया है। कृपया इसे लागू करने के लिए ऐप को पुनरारंभ करें।'
+                : 'A new update has been downloaded. Please restart the app to apply it.',
           ),
           actions: [
             ElevatedButton(
@@ -64,7 +331,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 }
                 SystemNavigator.pop();
               },
-              child: const Text('Restart'),
+              child: Text(code == 'hi' ? 'पुनरारंभ करें' : 'Restart'),
             ),
           ],
         );
@@ -74,6 +341,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final code = Localizations.localeOf(context).languageCode;
     return Scaffold(
       backgroundColor: HomeScreen._bg,
       appBar: AppBar(
@@ -83,12 +351,15 @@ class _HomeScreenState extends State<HomeScreen> {
           padding: const EdgeInsets.all(8.0),
           child: Image.asset('assets/onlylogo.png', fit: BoxFit.contain),
         ),
-        title: const FittedBox(
+        title: FittedBox(
           fit: BoxFit.scaleDown,
           alignment: Alignment.centerLeft,
           child: Text(
-            'Image to File Converter',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+            HomeScreenLanguage.getAppTitle(code),
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ),
         actions: [
@@ -110,32 +381,32 @@ class _HomeScreenState extends State<HomeScreen> {
           _FeatureCard(
             background: HomeScreen._card,
             icon: Icons.image_rounded,
-            title: 'Single Image',
-            subtitle: 'Convert, Compress, Resize, Crop, Create PDF',
+            title: HomeScreenLanguage.getSingleImage(code),
+            subtitle: HomeScreenLanguage.getSingleImageSubtitle(code),
             onTap: () => Navigator.of(context).pushNamed('/single'),
           ),
           const SizedBox(height: 16),
           _FeatureCard(
             background: HomeScreen._card,
             icon: Icons.collections_rounded,
-            title: 'Multiple Images',
-            subtitle: 'Convert, Compress, Resize, Crop, Create PDF',
+            title: HomeScreenLanguage.getMultipleImages(code),
+            subtitle: HomeScreenLanguage.getMultipleImagesSubtitle(code),
             onTap: () => Navigator.of(context).pushNamed('/multiple'),
           ),
           const SizedBox(height: 16),
           _FeatureCard(
             background: HomeScreen._card,
             icon: Icons.picture_as_pdf_rounded,
-            title: 'Create PDF',
-            subtitle: 'Select multiple images and build a PDF with pages',
+            title: HomeScreenLanguage.getCreatePdf(code),
+            subtitle: HomeScreenLanguage.getCreatePdfSubtitle(code),
             onTap: () => Navigator.of(context).pushNamed('/create-pdf'),
           ),
           const SizedBox(height: 16),
           _FeatureCard(
             background: HomeScreen._card,
             icon: Icons.folder_rounded,
-            title: 'Result Folder',
-            subtitle: 'View & manage all saved images and PDFs',
+            title: HomeScreenLanguage.getResultFolder(code),
+            subtitle: HomeScreenLanguage.getResultFolderSubtitle(code),
             onTap: () => Navigator.of(context).pushNamed('/results'),
           ),
           const SizedBox(height: 20),
@@ -143,14 +414,16 @@ class _HomeScreenState extends State<HomeScreen> {
             builder: (context, constraints) {
               final w = constraints.maxWidth;
               final h = (w * 0.82).clamp(290.0, 380.0);
-              return Container(
-                height: h,
-                decoration: BoxDecoration(
-                  color: HomeScreen._card,
-                  borderRadius: BorderRadius.circular(18),
+              return ConnectivityAdWrapper(
+                child: Container(
+                  height: h,
+                  decoration: BoxDecoration(
+                    color: HomeScreen._card,
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: const NativeAdBox(adKey: 'home'),
                 ),
-                clipBehavior: Clip.antiAlias,
-                child: const _HomeNativeAdBox(),
               );
             },
           ),

@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../language/report_bugs_screen_language.dart';
 
 class ReportBugsScreen extends StatefulWidget {
   const ReportBugsScreen({super.key});
@@ -95,21 +96,19 @@ class _ReportBugsScreenState extends State<ReportBugsScreen> {
       if (!launched) {
         await Clipboard.setData(ClipboardData(text: body));
         if (!mounted) return;
+        final code = Localizations.localeOf(context).languageCode;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Unable to open email app. Report copied to clipboard.',
-            ),
+          SnackBar(
+            content: Text(ReportBugsScreenLanguage.getUnableToOpenEmail(code)),
           ),
         );
         return;
       }
 
       if (!mounted) return;
+      final code = Localizations.localeOf(context).languageCode;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Email opened. Please tap Send to report.'),
-        ),
+        SnackBar(content: Text(ReportBugsScreenLanguage.getEmailOpened(code))),
       );
     } finally {
       if (mounted) {
@@ -137,15 +136,16 @@ class _ReportBugsScreenState extends State<ReportBugsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final code = Localizations.localeOf(context).languageCode;
     return Scaffold(
       backgroundColor: ReportBugsScreen.bg,
       appBar: AppBar(
         backgroundColor: ReportBugsScreen.bg,
         foregroundColor: Colors.white,
         elevation: 0,
-        title: const Text(
-          'Report Bugs',
-          style: TextStyle(fontWeight: FontWeight.w800),
+        title: Text(
+          ReportBugsScreenLanguage.getReportBugs(code),
+          style: const TextStyle(fontWeight: FontWeight.w800),
         ),
       ),
       body: SafeArea(
@@ -165,9 +165,9 @@ class _ReportBugsScreenState extends State<ReportBugsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Tell us what went wrong',
-                        style: TextStyle(
+                      Text(
+                        ReportBugsScreenLanguage.getTellUsWhatWentWrong(code),
+                        style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.w900,
                           fontSize: 16,
@@ -176,8 +176,10 @@ class _ReportBugsScreenState extends State<ReportBugsScreen> {
                       const SizedBox(height: 6),
                       Text(
                         _appVersion == null
-                            ? 'Your report will be sent to our support email.'
-                            : 'Your report will be sent to our support email. (v$_appVersion)',
+                            ? ReportBugsScreenLanguage.getReportSentToEmail(
+                                code,
+                              )
+                            : '${ReportBugsScreenLanguage.getReportSentToEmail(code)} (v$_appVersion)',
                         style: const TextStyle(
                           color: Colors.white70,
                           fontWeight: FontWeight.w600,
@@ -190,7 +192,9 @@ class _ReportBugsScreenState extends State<ReportBugsScreen> {
                           color: Colors.white,
                           fontWeight: FontWeight.w600,
                         ),
-                        decoration: _inputDecoration('Short title (optional)'),
+                        decoration: _inputDecoration(
+                          ReportBugsScreenLanguage.getShortTitleOptional(code),
+                        ),
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
@@ -201,11 +205,19 @@ class _ReportBugsScreenState extends State<ReportBugsScreen> {
                         ),
                         minLines: 4,
                         maxLines: 8,
-                        decoration: _inputDecoration('What happened?'),
+                        decoration: _inputDecoration(
+                          ReportBugsScreenLanguage.getWhatHappened(code),
+                        ),
                         validator: (v) {
                           final t = (v ?? '').trim();
-                          if (t.isEmpty) return 'Please describe the issue.';
-                          if (t.length < 8) return 'Please add more details.';
+                          if (t.isEmpty)
+                            return ReportBugsScreenLanguage.getDescribeIssue(
+                              code,
+                            );
+                          if (t.length < 8)
+                            return ReportBugsScreenLanguage.getAddMoreDetails(
+                              code,
+                            );
                           return null;
                         },
                       ),
@@ -219,7 +231,7 @@ class _ReportBugsScreenState extends State<ReportBugsScreen> {
                         minLines: 3,
                         maxLines: 7,
                         decoration: _inputDecoration(
-                          'Steps to reproduce (optional)',
+                          ReportBugsScreenLanguage.getStepsToReproduce(code),
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -246,7 +258,9 @@ class _ReportBugsScreenState extends State<ReportBugsScreen> {
                                 )
                               : const Icon(Icons.send_rounded),
                           label: Text(
-                            _submitting ? 'Opening Email...' : 'Submit',
+                            _submitting
+                                ? ReportBugsScreenLanguage.getOpeningEmail(code)
+                                : ReportBugsScreenLanguage.getSubmit(code),
                             style: const TextStyle(fontWeight: FontWeight.w900),
                           ),
                         ),

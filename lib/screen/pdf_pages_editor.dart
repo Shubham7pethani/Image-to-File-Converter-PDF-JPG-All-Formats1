@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../language/pdf_pages_editor_language.dart';
 import '../services/createpdflogic.dart';
 import '../services/image_processing_service.dart';
 import '../services/models.dart';
@@ -339,12 +340,13 @@ class _PdfPagesEditorState extends State<PdfPagesEditor> {
       }
 
       if (!mounted) return;
+      final code = Localizations.localeOf(context).languageCode;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             parts <= 1
-                ? 'PDF saved in Result Folder. Gallery save supports images only.'
-                : 'Saved $parts PDF parts in Result Folder.',
+                ? PdfPagesEditorLanguage.getPdfSavedFolder(code)
+                : PdfPagesEditorLanguage.getPdfPartsSaved(code, parts),
           ),
         ),
       );
@@ -353,8 +355,8 @@ class _PdfPagesEditorState extends State<PdfPagesEditor> {
         try {
           unawaited(
             _progressChannel.invokeMethod('complete', {
-              'title': 'Process completed',
-              'body': 'Tap to see results',
+              'title': PdfPagesEditorLanguage.getProcessCompleted(code),
+              'body': PdfPagesEditorLanguage.getTapToSeeResults(code),
             }),
           );
         } catch (_) {}
@@ -372,10 +374,16 @@ class _PdfPagesEditorState extends State<PdfPagesEditor> {
         } catch (_) {}
       }
       if (!mounted) return;
+      final code = Localizations.localeOf(context).languageCode;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Failed to save: ${e.toString().length > 120 ? e.toString().substring(0, 120) : e.toString()}',
+            PdfPagesEditorLanguage.getFailedToSave(
+              code,
+              e.toString().length > 120
+                  ? e.toString().substring(0, 120)
+                  : e.toString(),
+            ),
           ),
         ),
       );
@@ -389,11 +397,15 @@ class _PdfPagesEditorState extends State<PdfPagesEditor> {
   }
 
   Widget _buildEditBody() {
+    final code = Localizations.localeOf(context).languageCode;
     if (_logic.pages.isEmpty) {
-      return const Center(
+      return Center(
         child: Text(
-          'No pages selected.',
-          style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w700),
+          PdfPagesEditorLanguage.getNoPagesSelected(code),
+          style: const TextStyle(
+            color: Colors.white70,
+            fontWeight: FontWeight.w700,
+          ),
         ),
       );
     }
@@ -422,7 +434,7 @@ class _PdfPagesEditorState extends State<PdfPagesEditor> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        'Page ${i + 1}',
+                        '${PdfPagesEditorLanguage.getPage(code)} ${i + 1}',
                         style: TextStyle(
                           fontWeight: FontWeight.w800,
                           color: selected ? Colors.black : Colors.white,
@@ -459,7 +471,7 @@ class _PdfPagesEditorState extends State<PdfPagesEditor> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Preview (Page ${_activeIndex + 1})',
+                '${PdfPagesEditorLanguage.getPreview(code)} (${PdfPagesEditorLanguage.getPage(code)} ${_activeIndex + 1})',
                 style: const TextStyle(fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 10),
@@ -478,10 +490,14 @@ class _PdfPagesEditorState extends State<PdfPagesEditor> {
                             ),
                           )
                         : (_previewBytes == null
-                              ? const Center(
+                              ? Center(
                                   child: Text(
-                                    'Preview unavailable',
-                                    style: TextStyle(color: Colors.white70),
+                                    PdfPagesEditorLanguage.getPreviewUnavailable(
+                                      code,
+                                    ),
+                                    style: const TextStyle(
+                                      color: Colors.white70,
+                                    ),
                                   ),
                                 )
                               : Image.memory(
@@ -512,9 +528,9 @@ class _PdfPagesEditorState extends State<PdfPagesEditor> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Compression',
-                style: TextStyle(fontWeight: FontWeight.w800),
+              Text(
+                PdfPagesEditorLanguage.getCompression(code),
+                style: const TextStyle(fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 8),
               SwitchListTile(
@@ -527,14 +543,14 @@ class _PdfPagesEditorState extends State<PdfPagesEditor> {
                   });
                   unawaited(_buildPreview());
                 },
-                title: const Text('Enable compression'),
+                title: Text(PdfPagesEditorLanguage.getEnableCompression(code)),
               ),
               const SizedBox(height: 6),
               Row(
                 children: [
-                  const Text(
-                    'Quality',
-                    style: TextStyle(color: Colors.white70),
+                  Text(
+                    PdfPagesEditorLanguage.getQuality(code),
+                    style: const TextStyle(color: Colors.white70),
                   ),
                   const Spacer(),
                   Text(
@@ -571,9 +587,9 @@ class _PdfPagesEditorState extends State<PdfPagesEditor> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Resize',
-                style: TextStyle(fontWeight: FontWeight.w800),
+              Text(
+                PdfPagesEditorLanguage.getResize(code),
+                style: const TextStyle(fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 8),
               SwitchListTile(
@@ -592,7 +608,7 @@ class _PdfPagesEditorState extends State<PdfPagesEditor> {
                   });
                   unawaited(_buildPreview());
                 },
-                title: const Text('Enable resize'),
+                title: Text(PdfPagesEditorLanguage.getEnableResize(code)),
               ),
               const SizedBox(height: 8),
               Row(
@@ -602,9 +618,9 @@ class _PdfPagesEditorState extends State<PdfPagesEditor> {
                       controller: _wController,
                       keyboardType: TextInputType.number,
                       enabled: s.resizeEnabled,
-                      decoration: const InputDecoration(
-                        labelText: 'Width',
-                        border: OutlineInputBorder(),
+                      decoration: InputDecoration(
+                        labelText: PdfPagesEditorLanguage.getWidth(code),
+                        border: const OutlineInputBorder(),
                       ),
                       onChanged: (_) {
                         setState(() {
@@ -623,9 +639,9 @@ class _PdfPagesEditorState extends State<PdfPagesEditor> {
                       controller: _hController,
                       keyboardType: TextInputType.number,
                       enabled: s.resizeEnabled,
-                      decoration: const InputDecoration(
-                        labelText: 'Height',
-                        border: OutlineInputBorder(),
+                      decoration: InputDecoration(
+                        labelText: PdfPagesEditorLanguage.getHeight(code),
+                        border: const OutlineInputBorder(),
                       ),
                       onChanged: (_) {
                         setState(() {
@@ -653,10 +669,10 @@ class _PdfPagesEditorState extends State<PdfPagesEditor> {
           padding: const EdgeInsets.all(14),
           child: Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: Text(
-                  'Keep EXIF (if supported)',
-                  style: TextStyle(fontWeight: FontWeight.w800),
+                  PdfPagesEditorLanguage.getKeepExifIfSupported(code),
+                  style: const TextStyle(fontWeight: FontWeight.w800),
                 ),
               ),
               Checkbox(
@@ -677,11 +693,15 @@ class _PdfPagesEditorState extends State<PdfPagesEditor> {
   }
 
   Widget _buildReorderBody() {
+    final code = Localizations.localeOf(context).languageCode;
     if (_logic.pages.isEmpty) {
-      return const Center(
+      return Center(
         child: Text(
-          'No pages selected.',
-          style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w700),
+          PdfPagesEditorLanguage.getNoPagesSelected(code),
+          style: const TextStyle(
+            color: Colors.white70,
+            fontWeight: FontWeight.w700,
+          ),
         ),
       );
     }
@@ -740,7 +760,7 @@ class _PdfPagesEditorState extends State<PdfPagesEditor> {
               ),
             ),
             title: Text(
-              'Page ${index + 1}',
+              '${PdfPagesEditorLanguage.getPage(code)} ${index + 1}',
               style: const TextStyle(fontWeight: FontWeight.w800),
             ),
             subtitle: Text(
@@ -769,16 +789,27 @@ class _PdfPagesEditorState extends State<PdfPagesEditor> {
 
   @override
   Widget build(BuildContext context) {
+    final code = Localizations.localeOf(context).languageCode;
     return Scaffold(
       backgroundColor: PdfPagesEditor.bg,
       appBar: AppBar(
         backgroundColor: PdfPagesEditor.bg,
-        foregroundColor: Colors.white,
-        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            if (_stage == _PdfEditorStage.reorder) {
+              setState(() {
+                _stage = _PdfEditorStage.edit;
+              });
+            } else {
+              Navigator.of(context).maybePop();
+            }
+          },
+        ),
         title: Text(
           _stage == _PdfEditorStage.reorder
-              ? 'Reorder Pages'
-              : 'Create PDF (${_logic.pages.isEmpty ? 0 : _activeIndex + 1}/${_logic.pages.length})',
+              ? PdfPagesEditorLanguage.getReorderPages(code)
+              : '${PdfPagesEditorLanguage.getCreatePdf(code)} (${_logic.pages.isEmpty ? 0 : _activeIndex + 1}/${_logic.pages.length})',
           style: const TextStyle(fontWeight: FontWeight.w800),
         ),
       ),
@@ -813,11 +844,11 @@ class _PdfPagesEditorState extends State<PdfPagesEditor> {
                         ),
                       ),
                       icon: const Icon(Icons.image),
-                      label: const FittedBox(
+                      label: FittedBox(
                         fit: BoxFit.scaleDown,
                         child: Text(
-                          'Change',
-                          style: TextStyle(fontWeight: FontWeight.w800),
+                          PdfPagesEditorLanguage.getChange(code),
+                          style: const TextStyle(fontWeight: FontWeight.w800),
                         ),
                       ),
                     ),
@@ -839,11 +870,11 @@ class _PdfPagesEditorState extends State<PdfPagesEditor> {
                         ),
                       ),
                       icon: const Icon(Icons.check),
-                      label: const FittedBox(
+                      label: FittedBox(
                         fit: BoxFit.scaleDown,
                         child: Text(
-                          'Save',
-                          style: TextStyle(fontWeight: FontWeight.w800),
+                          PdfPagesEditorLanguage.getSave(code),
+                          style: const TextStyle(fontWeight: FontWeight.w800),
                         ),
                       ),
                     ),
@@ -866,11 +897,11 @@ class _PdfPagesEditorState extends State<PdfPagesEditor> {
                         ),
                       ),
                       icon: const Icon(Icons.done_all),
-                      label: const FittedBox(
+                      label: FittedBox(
                         fit: BoxFit.scaleDown,
                         child: Text(
-                          'Save All',
-                          style: TextStyle(fontWeight: FontWeight.w800),
+                          PdfPagesEditorLanguage.getSaveAll(code),
+                          style: const TextStyle(fontWeight: FontWeight.w800),
                         ),
                       ),
                     ),
@@ -897,11 +928,11 @@ class _PdfPagesEditorState extends State<PdfPagesEditor> {
                         ),
                       ),
                       icon: const Icon(Icons.edit),
-                      label: const FittedBox(
+                      label: FittedBox(
                         fit: BoxFit.scaleDown,
                         child: Text(
-                          'Back',
-                          style: TextStyle(fontWeight: FontWeight.w800),
+                          PdfPagesEditorLanguage.getBack(code),
+                          style: const TextStyle(fontWeight: FontWeight.w800),
                         ),
                       ),
                     ),

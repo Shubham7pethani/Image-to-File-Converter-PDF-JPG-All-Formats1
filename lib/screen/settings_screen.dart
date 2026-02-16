@@ -2,11 +2,14 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../language/settings_screen_language.dart';
+import '../language/language_selection_screen_language.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../language/home_screen_language.dart';
 import '../services/app_settings.dart';
 import '../services/output_storage_service.dart';
 
@@ -26,29 +29,30 @@ class _ComingSoonCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final code = Localizations.localeOf(context).languageCode;
     return Container(
       decoration: BoxDecoration(
         color: SettingsScreen.card,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: const Color(0x38E2C078)),
       ),
-      child: const Padding(
-        padding: EdgeInsets.all(16),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Coming Soon',
-              style: TextStyle(
+              SettingsScreenLanguage.getComingSoon(code),
+              style: const TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.w900,
                 fontSize: 16,
               ),
             ),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             Text(
-              'New featured apps will appear here in future updates.',
-              style: TextStyle(
+              SettingsScreenLanguage.getNewFeaturedApps(code),
+              style: const TextStyle(
                 color: Colors.white70,
                 fontWeight: FontWeight.w600,
               ),
@@ -56,6 +60,29 @@ class _ComingSoonCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _LanguageTile extends StatelessWidget {
+  const _LanguageTile({
+    required this.title,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String title;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      title: Text(title, style: const TextStyle(color: Colors.white)),
+      trailing: selected
+          ? const Icon(Icons.check, color: SettingsScreen.gold)
+          : null,
+      onTap: onTap,
     );
   }
 }
@@ -71,6 +98,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   String? _versionLabel;
   String? _packageName;
+  String _currentLanguageCode = 'en';
 
   @override
   void initState() {
@@ -86,6 +114,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _photoSpeedUp = prefs.getBool(AppSettings.prefPhotoSpeedUp) ?? false;
       _preventDuplicates =
           prefs.getBool(AppSettings.prefPreventDuplicates) ?? true;
+      _currentLanguageCode =
+          prefs.getString(AppSettings.prefLanguageCode) ?? 'en';
       _versionLabel = 'v${info.version}';
       _packageName = info.packageName;
       _loading = false;
@@ -121,6 +151,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final rootContext = context;
     final navigator = Navigator.of(rootContext);
     final messenger = ScaffoldMessenger.of(rootContext);
+    final code = Localizations.localeOf(rootContext).languageCode;
 
     final dir = await _outputStorageService.getOutputDirectory();
     if (!mounted) return;
@@ -144,7 +175,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             fontWeight: FontWeight.w600,
             fontSize: 14,
           ),
-          title: const Text('Saved Path'),
+          title: Text(SettingsScreenLanguage.getSavedPath(code)),
           content: SelectableText(dir.path),
           actions: [
             TextButton(
@@ -154,10 +185,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 if (!mounted) return;
                 navigator.pop();
                 messenger.showSnackBar(
-                  const SnackBar(content: Text('Path copied')),
+                  SnackBar(
+                    content: Text(SettingsScreenLanguage.getPathCopied(code)),
+                  ),
                 );
               },
-              child: const Text('Copy'),
+              child: Text(SettingsScreenLanguage.getCopy(code)),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
@@ -171,7 +204,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 navigator.pop();
                 navigator.pushNamed('/results');
               },
-              child: const Text('Open'),
+              child: Text(SettingsScreenLanguage.getOpen(code)),
             ),
           ],
         );
@@ -180,6 +213,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _clearExportPaths() async {
+    final code = Localizations.localeOf(context).languageCode;
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -198,13 +232,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
           fontWeight: FontWeight.w600,
           fontSize: 14,
         ),
-        title: const Text('Clear Result Folder?'),
-        content: const Text('This will delete all saved images and PDFs.'),
+        title: Text(SettingsScreenLanguage.getClearResultFolder(code)),
+        content: Text(SettingsScreenLanguage.getClearResultFolderDesc(code)),
         actions: [
           TextButton(
             style: TextButton.styleFrom(foregroundColor: Colors.white70),
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+            child: Text(SettingsScreenLanguage.getCancel(code)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -215,7 +249,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Delete'),
+            child: Text(SettingsScreenLanguage.getDelete(code)),
           ),
         ],
       ),
@@ -233,18 +267,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
         } catch (_) {}
       }
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Deleted $deleted file(s)')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(SettingsScreenLanguage.getDeletedFiles(code, deleted)),
+        ),
+      );
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Failed to clear files.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(SettingsScreenLanguage.getFailedToClear(code))),
+      );
     }
   }
 
   Future<void> _resetDefaults() async {
+    final code = Localizations.localeOf(context).languageCode;
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -263,13 +300,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
           fontWeight: FontWeight.w600,
           fontSize: 14,
         ),
-        title: const Text('Reset to default?'),
-        content: const Text('This will reset settings to default values.'),
+        title: Text(SettingsScreenLanguage.getResetToDefault(code)),
+        content: Text(SettingsScreenLanguage.getResetToDefaultDesc(code)),
         actions: [
           TextButton(
             style: TextButton.styleFrom(foregroundColor: Colors.white70),
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+            child: Text(SettingsScreenLanguage.getCancel(code)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -280,7 +317,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Reset'),
+            child: Text(SettingsScreenLanguage.getReset(code)),
           ),
         ],
       ),
@@ -297,17 +334,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _preventDuplicates = true;
     });
 
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Defaults restored')));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(SettingsScreenLanguage.getDefaultsRestored(code))),
+    );
   }
 
   Future<void> _openUrl(String url) async {
+    final code = Localizations.localeOf(context).languageCode;
     final uri = Uri.parse(url);
     if (!await canLaunchUrl(uri)) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Cannot open link on this device.')),
+        SnackBar(content: Text(SettingsScreenLanguage.getCannotOpenLink(code))),
       );
       return;
     }
@@ -315,12 +353,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _shareApp() async {
+    final code = Localizations.localeOf(context).languageCode;
     await Share.share(
-      'Image to File Converter – PDF, JPG & All Formats\n${_storeListingUrl()}',
+      HomeScreenLanguage.getShareAppText(code, _storeListingUrl()),
     );
   }
 
   Future<void> _showMoreAppsComingSoon() async {
+    final code = Localizations.localeOf(context).languageCode;
     await showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
@@ -339,8 +379,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           fontWeight: FontWeight.w600,
           fontSize: 14,
         ),
-        title: const Text('Coming Soon'),
-        content: const Text('More apps will be available in the next version.'),
+        title: Text(SettingsScreenLanguage.getComingSoon(code)),
+        content: Text(SettingsScreenLanguage.getMoreApps(code)),
         actions: [
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -351,28 +391,91 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('OK'),
+            child: Text(SettingsScreenLanguage.getOk(code)),
           ),
         ],
       ),
     );
   }
 
+  Future<void> _changeLanguage() async {
+    await Navigator.pushNamed(context, '/language-selection');
+    if (!mounted) return;
+    await _load(); // Refresh settings and language code
+  }
+
+  String _getLanguageName() {
+    final nativeName = LanguageSelectionScreenLanguage.getLanguageName(
+      _currentLanguageCode,
+      _currentLanguageCode,
+    );
+    final englishNames = {
+      'en': 'English',
+      'hi': 'Hindi',
+      'es': 'Spanish',
+      'ps': 'Pashto',
+      'fil': 'Filipino',
+      'id': 'Indonesian',
+      'my': 'Burmese',
+      'ru': 'Russian',
+      'fa': 'Persian',
+      'bn': 'Bengali',
+      'mr': 'Marathi',
+      'te': 'Telugu',
+      'ta': 'Tamil',
+      'ur': 'Urdu',
+      'ms': 'Malay',
+      'pt': 'Portuguese',
+      'fr': 'French',
+      'de': 'German',
+      'ar': 'Arabic',
+      'tr': 'Turkish',
+      'vi': 'Vietnamese',
+      'th': 'Thai',
+      'ja': 'Japanese',
+      'ko': 'Korean',
+      'it': 'Italian',
+      'pl': 'Polish',
+      'uk': 'Ukrainian',
+      'nl': 'Dutch',
+      'ro': 'Romanian',
+      'el': 'Greek',
+      'cs': 'Czech',
+      'hu': 'Hungarian',
+      'sv': 'Swedish',
+      'zh': 'Chinese',
+      'he': 'Hebrew',
+      'da': 'Danish',
+      'fi': 'Finnish',
+      'no': 'Norwegian',
+      'sk': 'Slovak',
+      'bg': 'Bulgarian',
+      'hr': 'Croatian',
+      'sr': 'Serbian',
+      'ca': 'Catalan',
+    };
+    final englishName =
+        englishNames[_currentLanguageCode] ?? _currentLanguageCode;
+    return _currentLanguageCode == 'en'
+        ? nativeName
+        : '$nativeName ($englishName)';
+  }
+
   @override
   Widget build(BuildContext context) {
+    final code = _currentLanguageCode;
     return Scaffold(
       backgroundColor: SettingsScreen.bg,
       appBar: AppBar(
         backgroundColor: SettingsScreen.bg,
-        foregroundColor: Colors.white,
         elevation: 0,
+        title: Text(
+          SettingsScreenLanguage.getSettingsTitle(code),
+          style: const TextStyle(fontWeight: FontWeight.w800),
+        ),
         leading: IconButton(
           icon: const Icon(Icons.close),
           onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: const Text(
-          'Settings',
-          style: TextStyle(fontWeight: FontWeight.w800),
         ),
       ),
       body: _loading
@@ -384,17 +487,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
           : ListView(
               padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
               children: [
-                const _SectionHeader(title: 'Tools Related'),
+                _SectionHeader(
+                  title: SettingsScreenLanguage.getToolsRelated(code),
+                ),
                 _SettingsCard(
                   children: [
                     _SettingsTile(
+                      icon: Icons.language,
+                      title: SettingsScreenLanguage.getLanguage(code),
+                      onTap: _changeLanguage,
+                      trailing: Text(
+                        _getLanguageName(),
+                        style: const TextStyle(color: SettingsScreen.gold),
+                      ),
+                    ),
+                    _SettingsTile(
                       icon: Icons.save_outlined,
-                      title: 'Saved Path',
+                      title: SettingsScreenLanguage.getSavedPath(code),
                       onTap: _showSavedPath,
                     ),
                     _SettingsTile(
                       icon: Icons.speed,
-                      title: 'Photo Speed Up',
+                      title: SettingsScreenLanguage.getPhotoSpeedUp(code),
                       onTap: _togglePhotoSpeedUp,
                       trailing: Switch(
                         value: _photoSpeedUp,
@@ -407,12 +521,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     _SettingsTile(
                       icon: Icons.delete_outline,
-                      title: 'Clear Export Paths',
+                      title: SettingsScreenLanguage.getClearExportPaths(code),
                       onTap: _clearExportPaths,
                     ),
                     _SettingsTile(
                       icon: Icons.copy_all_outlined,
-                      title: 'Prevent Duplicate Photos',
+                      title: SettingsScreenLanguage.getPreventDuplicatePhotos(
+                        code,
+                      ),
                       onTap: _togglePreventDuplicates,
                       trailing: Switch(
                         value: _preventDuplicates,
@@ -425,52 +541,58 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     _SettingsTile(
                       icon: Icons.settings_backup_restore,
-                      title: 'Default Configurations',
+                      title: SettingsScreenLanguage.getDefaultConfigurations(
+                        code,
+                      ),
                       onTap: _resetDefaults,
                     ),
                   ],
                 ),
                 const SizedBox(height: 16),
-                const _SectionHeader(title: 'Feature App'),
-                _ComingSoonCard(),
+                _SectionHeader(
+                  title: SettingsScreenLanguage.getFeatureApp(code),
+                ),
+                const _ComingSoonCard(),
                 const SizedBox(height: 16),
-                const _SectionHeader(title: 'App Related'),
+                _SectionHeader(
+                  title: SettingsScreenLanguage.getAppRelated(code),
+                ),
                 _SettingsCard(
                   children: [
                     _SettingsTile(
                       icon: Icons.bug_report_outlined,
-                      title: 'Report bugs',
+                      title: SettingsScreenLanguage.getReportBugs(code),
                       onTap: () {
                         Navigator.of(context).pushNamed('/report-bugs');
                       },
                     ),
                     _SettingsTile(
                       icon: Icons.share_outlined,
-                      title: 'Share',
+                      title: SettingsScreenLanguage.getShare(code),
                       onTap: _shareApp,
                     ),
                     _SettingsTile(
                       icon: Icons.thumb_up_outlined,
-                      title: 'Rate Us',
+                      title: SettingsScreenLanguage.getRateUs(code),
                       onTap: () async {
                         await _openUrl(_storeListingUrl());
                       },
                     ),
                     _SettingsTile(
                       icon: Icons.contact_support_outlined,
-                      title: 'Contact us',
+                      title: SettingsScreenLanguage.getContactUs(code),
                       onTap: () async {
                         await _openUrl('mailto:imagefileconverter@gmail.com');
                       },
                     ),
                     _SettingsTile(
                       icon: Icons.apps_outlined,
-                      title: 'More apps',
+                      title: SettingsScreenLanguage.getMoreApps(code),
                       onTap: _showMoreAppsComingSoon,
                     ),
                     _SettingsTile(
                       icon: Icons.privacy_tip_outlined,
-                      title: 'Privacy Policy',
+                      title: SettingsScreenLanguage.getPrivacyPolicy(code),
                       onTap: () {
                         Navigator.of(context).pushNamed('/privacy-policy');
                       },

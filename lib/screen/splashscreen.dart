@@ -118,11 +118,12 @@ class _SplashScreenState extends State<SplashScreen> {
       final permission = await _requestPermissions();
       if (!mounted) return;
 
-      if (!permission.allowed) {
+      // Only show error if they permanently denied, otherwise just try to proceed
+      if (!permission.allowed && permission.openSettings) {
         setState(() {
           _isLoading = false;
           _error = 'Permission required to continue.';
-          _showOpenSettings = permission.openSettings;
+          _showOpenSettings = true;
         });
         return;
       }
@@ -141,12 +142,11 @@ class _SplashScreenState extends State<SplashScreen> {
       }
 
       Navigator.of(context).pushReplacementNamed('/home');
-    } catch (_) {
+    } catch (e) {
+      debugPrint('SplashScreen error: $e');
       if (!mounted) return;
-      setState(() {
-        _isLoading = false;
-        _error = 'Something went wrong. Please try again.';
-      });
+      // If something fails (like update check), just try to go home instead of showing "Try Again"
+      Navigator.of(context).pushReplacementNamed('/home');
     }
   }
 
@@ -323,8 +323,15 @@ class _SplashScreenState extends State<SplashScreen> {
                 ],
                 const SizedBox(height: 18),
                 if (_isLoading)
-                  const CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  SizedBox(
+                    width: 40,
+                    height: 40,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 3,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        Colors.white.withOpacity(0.9),
+                      ),
+                    ),
                   ),
                 if (!_isLoading && _error != null) ...[
                   Text(

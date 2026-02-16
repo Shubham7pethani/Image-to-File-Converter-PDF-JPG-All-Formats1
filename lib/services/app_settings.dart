@@ -5,6 +5,17 @@ class AppSettings {
 
   static const String prefPhotoSpeedUp = 'settings.photo_speed_up';
   static const String prefPreventDuplicates = 'settings.prevent_duplicates';
+  static const String prefLanguageCode = 'settings.language_code';
+
+  Future<String?> getLanguageCode() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(prefLanguageCode);
+  }
+
+  Future<void> setLanguageCode(String value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(prefLanguageCode, value);
+  }
 
   Future<bool> getPhotoSpeedUp() async {
     final prefs = await SharedPreferences.getInstance();

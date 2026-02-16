@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import '../language/privacy_policy_screen_language.dart';
 
 class PrivacyPolicyScreen extends StatefulWidget {
   const PrivacyPolicyScreen({super.key});
@@ -62,6 +63,7 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
   @override
   Widget build(BuildContext context) {
     final showProgress = _progress < 100;
+    final code = Localizations.localeOf(context).languageCode;
 
     return Scaffold(
       backgroundColor: PrivacyPolicyScreen.bg,
@@ -69,13 +71,13 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
         backgroundColor: PrivacyPolicyScreen.bg,
         foregroundColor: Colors.white,
         elevation: 0,
-        title: const Text(
-          'Privacy Policy',
-          style: TextStyle(fontWeight: FontWeight.w800),
+        title: Text(
+          PrivacyPolicyScreenLanguage.getPrivacyPolicy(code),
+          style: const TextStyle(fontWeight: FontWeight.w800),
         ),
         actions: [
           IconButton(
-            tooltip: 'Reload',
+            tooltip: PrivacyPolicyScreenLanguage.getReload(code),
             onPressed: () {
               setState(() {
                 _progress = 0;
@@ -117,9 +119,9 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Unable to load privacy policy.',
-                          style: TextStyle(
+                        Text(
+                          PrivacyPolicyScreenLanguage.getUnableToLoad(code),
+                          style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.w900,
                             fontSize: 16,
@@ -150,7 +152,9 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
                             _controller.reload();
                           },
                           icon: const Icon(Icons.refresh),
-                          label: const Text('Try again'),
+                          label: Text(
+                            PrivacyPolicyScreenLanguage.getTryAgain(code),
+                          ),
                         ),
                       ],
                     ),

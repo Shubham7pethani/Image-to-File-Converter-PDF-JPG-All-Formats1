@@ -7,15 +7,17 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'services/app_settings.dart';
 import 'package:in_app_update/in_app_update.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'services/external_open_service.dart';
-import 'services/update_service.dart';
 import 'screen/home_screen.dart';
+import 'screen/language_selection_screen.dart';
 import 'screen/multiple_images_screen.dart';
 import 'screen/privacy_policy_screen.dart';
 import 'screen/report_bugs.dart';
@@ -35,15 +37,18 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Enable edge-to-edge display
-  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-  SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
-      systemNavigationBarColor: Colors.transparent,
-      statusBarColor: Colors.transparent,
-      systemNavigationBarIconBrightness: Brightness.light,
-      statusBarIconBrightness: Brightness.light,
-    ),
-  );
+  if (Platform.isAndroid) {
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    SystemChrome.setSystemUIOverlayStyle(
+      const SystemUiOverlayStyle(
+        systemNavigationBarColor: Colors.transparent,
+        systemNavigationBarDividerColor: Colors.transparent,
+        statusBarColor: Colors.transparent,
+        systemNavigationBarIconBrightness: Brightness.light,
+        statusBarIconBrightness: Brightness.light,
+      ),
+    );
+  }
 
   await Firebase.initializeApp();
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
@@ -56,13 +61,30 @@ class MyApp extends StatefulWidget {
   const MyApp({super.key});
 
   @override
-  State<MyApp> createState() => _MyAppState();
+  State<MyApp> createState() => MyAppState();
 }
 
-class _MyAppState extends State<MyApp> {
+class MyAppState extends State<MyApp> {
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
   StreamSubscription<String>? _externalOpenSub;
   String? _pendingRoute;
+  Locale? _locale;
+  final AppSettings _settings = const AppSettings();
+
+  Future<void> _loadLocale() async {
+    final code = await _settings.getLanguageCode();
+    if (code != null) {
+      setState(() {
+        _locale = Locale(code);
+      });
+    }
+  }
+
+  void setLocale(Locale locale) {
+    setState(() {
+      _locale = locale;
+    });
+  }
 
   static const String _testBannerAdUnitId =
       'ca-app-pub-3645213065759243/8959837355';
@@ -184,6 +206,7 @@ class _MyAppState extends State<MyApp> {
     unawaited(_checkForUpdates());
     unawaited(_initNotifications());
     unawaited(_initDeepLinks());
+    unawaited(_loadLocale());
 
     _externalOpenSub = ExternalOpenService.instance.stream.listen((path) {
       final nav = _navigatorKey.currentState;
@@ -206,6 +229,57 @@ class _MyAppState extends State<MyApp> {
     return MaterialApp(
       title: 'Image to File Converter – PDF, JPG & All Formats',
       navigatorKey: _navigatorKey,
+      locale: _locale,
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('en'),
+        Locale('hi'),
+        Locale('es'),
+        Locale('ps'),
+        Locale('fil'),
+        Locale('id'),
+        Locale('my'),
+        Locale('ru'),
+        Locale('fa'),
+        Locale('bn'),
+        Locale('mr'),
+        Locale('te'),
+        Locale('ta'),
+        Locale('ur'),
+        Locale('ms'),
+        Locale('pt'),
+        Locale('fr'),
+        Locale('de'),
+        Locale('ar'),
+        Locale('tr'),
+        Locale('vi'),
+        Locale('th'),
+        Locale('ja'),
+        Locale('ko'),
+        Locale('it'),
+        Locale('pl'),
+        Locale('uk'),
+        Locale('nl'),
+        Locale('ro'),
+        Locale('el'),
+        Locale('cs'),
+        Locale('hu'),
+        Locale('sv'),
+        Locale('zh'),
+        Locale('he'),
+        Locale('da'),
+        Locale('fi'),
+        Locale('no'),
+        Locale('sk'),
+        Locale('bg'),
+        Locale('hr'),
+        Locale('sr'),
+        Locale('ca'),
+      ],
       builder: (context, child) {
         return _GlobalBannerScaffold(
           backgroundColor: const Color(0xFF1B1E23),
@@ -255,9 +329,14 @@ class _MyAppState extends State<MyApp> {
         '/settings': (context) => const SettingsScreen(),
         '/report-bugs': (context) => const ReportBugsScreen(),
         '/privacy-policy': (context) => const PrivacyPolicyScreen(),
+        '/language-selection': (context) => const LanguageSelectionScreen(),
       },
     );
   }
+}
+
+class GlobalAdController {
+  static final ValueNotifier<bool> showAds = ValueNotifier<bool>(false);
 }
 
 class _GlobalBannerScaffold extends StatefulWidget {
@@ -405,54 +484,58 @@ class _GlobalBannerScaffoldState extends State<_GlobalBannerScaffold> {
   @override
   Widget build(BuildContext context) {
     final ad = _bannerAd;
-    final adHeight = (_loaded && ad != null) ? ad.size.height.toDouble() : 0.0;
-    final bottomInset = MediaQuery.of(context).padding.bottom;
-    final reservedHeight = (_loaded && ad != null)
-        ? (adHeight + bottomInset)
-        : 0.0;
 
-    final mq = MediaQuery.of(context);
-    final adShowing = _loaded && ad != null;
+    return ValueListenableBuilder<bool>(
+      valueListenable: GlobalAdController.showAds,
+      builder: (context, adsVisible, _) {
+        final adShowing = _loaded && ad != null && adsVisible;
+        final adHeight = adShowing ? ad.size.height.toDouble() : 0.0;
+        final bottomInset = MediaQuery.of(context).padding.bottom;
+        final reservedHeight = adShowing ? (adHeight + bottomInset) : 0.0;
 
-    return ColoredBox(
-      color: widget.backgroundColor,
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: Padding(
-              padding: EdgeInsets.only(bottom: reservedHeight),
-              child: MediaQuery(
-                data: adShowing
-                    ? mq.copyWith(
-                        padding: mq.padding.copyWith(bottom: 0),
-                        viewPadding: mq.viewPadding.copyWith(bottom: 0),
-                      )
-                    : mq,
-                child: widget.child,
-              ),
-            ),
-          ),
-          if (adShowing)
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: SizedBox(
-                height: reservedHeight,
+        final mq = MediaQuery.of(context);
+
+        return ColoredBox(
+          color: widget.backgroundColor,
+          child: Stack(
+            children: [
+              Positioned.fill(
                 child: Padding(
-                  padding: EdgeInsets.only(bottom: bottomInset),
-                  child: Center(
-                    child: SizedBox(
-                      width: ad.size.width.toDouble(),
-                      height: adHeight,
-                      child: AdWidget(ad: ad),
-                    ),
+                  padding: EdgeInsets.only(bottom: reservedHeight),
+                  child: MediaQuery(
+                    data: adShowing
+                        ? mq.copyWith(
+                            padding: mq.padding.copyWith(bottom: 0),
+                            viewPadding: mq.viewPadding.copyWith(bottom: 0),
+                          )
+                        : mq,
+                    child: widget.child,
                   ),
                 ),
               ),
-            ),
-        ],
-      ),
+              if (adShowing)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: SizedBox(
+                    height: reservedHeight,
+                    child: Padding(
+                      padding: EdgeInsets.only(bottom: bottomInset),
+                      child: Center(
+                        child: SizedBox(
+                          width: ad.size.width.toDouble(),
+                          height: adHeight,
+                          child: AdWidget(ad: ad),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

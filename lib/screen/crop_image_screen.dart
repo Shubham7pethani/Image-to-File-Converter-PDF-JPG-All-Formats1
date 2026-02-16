@@ -3,6 +3,7 @@ import 'dart:ui' show ImageFilter;
 
 import 'package:crop_your_image/crop_your_image.dart';
 import 'package:flutter/material.dart';
+import '../language/crop_image_screen_language.dart';
 
 class CropImageScreen extends StatefulWidget {
   const CropImageScreen({super.key, required this.bytes});
@@ -22,15 +23,16 @@ class _CropImageScreenState extends State<CropImageScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final code = Localizations.localeOf(context).languageCode;
     return Scaffold(
       backgroundColor: CropImageScreen.bg,
       appBar: AppBar(
         backgroundColor: CropImageScreen.bg,
         foregroundColor: Colors.white,
         elevation: 0,
-        title: const Text(
-          'Crop',
-          style: TextStyle(fontWeight: FontWeight.w700),
+        title: Text(
+          CropImageScreenLanguage.getCrop(code),
+          style: const TextStyle(fontWeight: FontWeight.w700),
         ),
         actions: [
           TextButton(
@@ -41,7 +43,7 @@ class _CropImageScreenState extends State<CropImageScreen> {
                     _controller.crop();
                   },
             child: Text(
-              _isCropping ? '...' : 'Done',
+              _isCropping ? '...' : CropImageScreenLanguage.getDone(code),
               style: const TextStyle(
                 color: CropImageScreen.gold,
                 fontWeight: FontWeight.w800,

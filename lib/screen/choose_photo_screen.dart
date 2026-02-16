@@ -4,7 +4,9 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../language/choose_photo_screen_language.dart';
 import 'image_editor_screen.dart';
+import 'home_screen.dart';
 import '../services/app_settings.dart';
 import '../services/models.dart';
 
@@ -25,54 +27,24 @@ class _ChoosePhotoScreenState extends State<ChoosePhotoScreen> {
   final AppSettings _settings = const AppSettings();
   bool _isLoading = false;
 
-  static const int _maxMultiImages = 150;
-
   List<SelectedImage> _dedupeImages(List<SelectedImage> images) {
+    debugPrint('Deduplicating ${images.length} images...');
     final seen = <String>{};
     final out = <SelectedImage>[];
     for (final img in images) {
       final fp = _fingerprint(img);
       if (seen.add(fp)) {
         out.add(img);
+      } else {
+        debugPrint('Duplicate found: ${img.name}');
       }
     }
+    debugPrint('Deduplication finished. Remaining: ${out.length}');
     return out;
   }
 
   String _fingerprint(SelectedImage img) {
-    final bytes = img.bytes;
-    final len = bytes.length;
-    const sampleSize = 4096;
-    final takeFront = len < sampleSize ? len : sampleSize;
-    final takeBack = len < sampleSize ? 0 : sampleSize;
-
-    int hash = 0x811c9dc5;
-    hash = _fnv1aInt(hash, len);
-    hash = _fnv1a(hash, bytes.sublist(0, takeFront));
-    if (takeBack > 0) {
-      hash = _fnv1a(hash, bytes.sublist(len - takeBack));
-    }
-    return '$len|$hash';
-  }
-
-  int _fnv1a(int hash, List<int> data) {
-    for (final b in data) {
-      hash ^= (b & 0xff);
-      hash = (hash * 0x01000193) & 0xffffffff;
-    }
-    return hash;
-  }
-
-  int _fnv1aInt(int hash, int value) {
-    hash ^= (value & 0xff);
-    hash = (hash * 0x01000193) & 0xffffffff;
-    hash ^= ((value >> 8) & 0xff);
-    hash = (hash * 0x01000193) & 0xffffffff;
-    hash ^= ((value >> 16) & 0xff);
-    hash = (hash * 0x01000193) & 0xffffffff;
-    hash ^= ((value >> 24) & 0xff);
-    hash = (hash * 0x01000193) & 0xffffffff;
-    return hash;
+    return '${img.name}_${img.bytes.length}';
   }
 
   Future<void> _withLoader(Future<void> Function() action) async {
@@ -89,6 +61,7 @@ class _ChoosePhotoScreenState extends State<ChoosePhotoScreen> {
   }
 
   void _openEditor(List<SelectedImage> images) {
+    debugPrint('Opening editor with ${images.length} images');
     unawaited(
       Future<void>.delayed(Duration.zero, () {
         if (!mounted) return;
@@ -114,49 +87,29 @@ class _ChoosePhotoScreenState extends State<ChoosePhotoScreen> {
 
   Future<void> _pickFromGallery() async {
     await _withLoader(() async {
-      if (widget.allowMultiple) {
-        final files = await _picker.pickMultiImage(limit: _maxMultiImages);
-        if (!mounted) return;
-        if (files.isEmpty) return;
+      final List<XFile> files = await _picker.pickMultiImage();
+      if (!mounted) return;
+      if (files.isEmpty) return;
 
-        final cappedFiles = files.length > _maxMultiImages
-            ? files.take(_maxMultiImages).toList()
-            : files;
-
-        if (files.length > _maxMultiImages) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Selected more than 150 images. Using first 150.'),
-            ),
-          );
+      final images = <SelectedImage>[];
+      var count = 0;
+      for (final f in files) {
+        final bytes = await f.readAsBytes();
+        images.add(SelectedImage(name: f.name, bytes: bytes));
+        count++;
+        if (count % 5 == 0) {
+          await Future<void>.delayed(Duration.zero);
         }
-
-        final images = <SelectedImage>[];
-        var i = 0;
-        for (final f in cappedFiles) {
-          images.add(SelectedImage(name: f.name, bytes: await f.readAsBytes()));
-          i++;
-          if (i % 2 == 0) {
-            await Future<void>.delayed(Duration.zero);
-          }
-        }
-        if (!mounted) return;
-        final preventDuplicates = await _settings.getPreventDuplicates();
-        if (!mounted) return;
-        _openEditor(preventDuplicates ? _dedupeImages(images) : images);
-        return;
       }
-
-      final file = await _picker.pickImage(source: ImageSource.gallery);
       if (!mounted) return;
-      if (file == null) return;
-      final bytes = await file.readAsBytes();
+      final preventDuplicates = await _settings.getPreventDuplicates();
       if (!mounted) return;
-      _openEditor([SelectedImage(name: file.name, bytes: bytes)]);
+      _openEditor(preventDuplicates ? _dedupeImages(images) : images);
     });
   }
 
   Future<void> _pickWithFilePicker() async {
+    final code = Localizations.localeOf(context).languageCode;
     await _withLoader(() async {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.image,
@@ -167,35 +120,23 @@ class _ChoosePhotoScreenState extends State<ChoosePhotoScreen> {
       if (result == null || result.files.isEmpty) return;
 
       final images = <SelectedImage>[];
-      var i = 0;
+      var count = 0;
       for (final f in result.files) {
         final bytes = f.bytes;
         if (bytes == null) continue;
         images.add(SelectedImage(name: f.name, bytes: bytes));
-        i++;
-        if (i % 8 == 0) {
+        count++;
+        if (count % 5 == 0) {
           await Future<void>.delayed(Duration.zero);
         }
-      }
-
-      if (widget.allowMultiple && images.length > _maxMultiImages) {
-        final capped = images.take(_maxMultiImages).toList();
-        images
-          ..clear()
-          ..addAll(capped);
-
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Selected more than 150 images. Using first 150.'),
-          ),
-        );
       }
 
       if (images.isEmpty) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Unable to read selected file(s).')),
+          SnackBar(
+            content: Text(ChoosePhotoScreenLanguage.getUnableToReadFile(code)),
+          ),
         );
         return;
       }
@@ -209,6 +150,7 @@ class _ChoosePhotoScreenState extends State<ChoosePhotoScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final code = Localizations.localeOf(context).languageCode;
     return Scaffold(
       backgroundColor: ChoosePhotoScreen.bg,
       appBar: AppBar(
@@ -219,42 +161,71 @@ class _ChoosePhotoScreenState extends State<ChoosePhotoScreen> {
           icon: const Icon(Icons.close),
           onPressed: () => Navigator.of(context).maybePop(),
         ),
-        title: const Text(
-          'Choose Photo',
-          style: TextStyle(fontWeight: FontWeight.w700),
+        title: Text(
+          ChoosePhotoScreenLanguage.getTitle(
+            code,
+            widget.allowMultiple,
+            ModalRoute.of(context)?.settings.name == '/create-pdf',
+          ),
+          style: const TextStyle(fontWeight: FontWeight.w700),
         ),
       ),
       body: Stack(
         children: [
-          Padding(
-            padding: const EdgeInsets.all(24),
-            child: GridView.count(
-              crossAxisCount: 2,
-              mainAxisSpacing: 26,
-              crossAxisSpacing: 26,
-              children: [
-                _ChooseTile(
-                  icon: Icons.photo_camera_rounded,
-                  label: 'Camera',
-                  onTap: _pickFromCamera,
+          Column(
+            children: [
+              Expanded(
+                child: GridView.count(
+                  crossAxisCount: 2,
+                  mainAxisSpacing: 26,
+                  crossAxisSpacing: 26,
+                  padding: const EdgeInsets.all(24),
+                  children: [
+                    _ChooseTile(
+                      icon: Icons.photo_camera_rounded,
+                      label: ChoosePhotoScreenLanguage.getCamera(code),
+                      onTap: _pickFromCamera,
+                    ),
+                    _ChooseTile(
+                      icon: Icons.folder_rounded,
+                      label: ChoosePhotoScreenLanguage.getPickImage(code),
+                      onTap: _pickWithFilePicker,
+                    ),
+                    _ChooseTile(
+                      icon: Icons.photo_library_rounded,
+                      label: ChoosePhotoScreenLanguage.getPhotos(code),
+                      onTap: _pickFromGallery,
+                    ),
+                    _ChooseTile(
+                      icon: Icons.collections_rounded,
+                      label: ChoosePhotoScreenLanguage.getGallery(code),
+                      onTap: _pickFromGallery,
+                    ),
+                  ],
                 ),
-                _ChooseTile(
-                  icon: Icons.folder_rounded,
-                  label: 'Pick Image',
-                  onTap: _pickWithFilePicker,
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final w = constraints.maxWidth;
+                    final h = (w * 0.85).clamp(280.0, 360.0);
+                    return ConnectivityAdWrapper(
+                      child: Container(
+                        height: h,
+                        decoration: BoxDecoration(
+                          color: ChoosePhotoScreen.card,
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: const Color(0x38E2C078)),
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: const NativeAdBox(adKey: 'choose'),
+                      ),
+                    );
+                  },
                 ),
-                _ChooseTile(
-                  icon: Icons.photo_library_rounded,
-                  label: 'Photos',
-                  onTap: _pickFromGallery,
-                ),
-                _ChooseTile(
-                  icon: Icons.collections_rounded,
-                  label: 'Gallery',
-                  onTap: _pickFromGallery,
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
           if (_isLoading)
             const ColoredBox(

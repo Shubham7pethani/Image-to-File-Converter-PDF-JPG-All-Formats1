@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:open_filex/open_filex.dart';
 
+import '../language/result_folder_screen_language.dart';
 import '../services/gallery_save_service.dart';
 import '../services/branded_share_service.dart';
 import '../services/important_service.dart';
@@ -161,12 +162,17 @@ class _ResultFolderScreenState extends State<ResultFolderScreen> {
   }
 
   Future<void> _downloadToPhone(_OutputItem item) async {
+    final code = Localizations.localeOf(context).languageCode;
     final ok = await _gallerySaveService.saveFile(filePath: item.path);
     if (!mounted) return;
 
     if (ok) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Saved to phone (Gallery).')),
+        SnackBar(
+          content: Text(
+            ResultFolderScreenLanguage.getSavedToPhoneGallery(code),
+          ),
+        ),
       );
       return;
     }
@@ -177,14 +183,15 @@ class _ResultFolderScreenState extends State<ResultFolderScreen> {
       SnackBar(
         content: Text(
           isPdf
-              ? 'PDF is saved in Result Folder. Gallery save supports images only.'
-              : 'Failed to save to Gallery. Please allow storage/photos permission.',
+              ? ResultFolderScreenLanguage.getPdfSavedResultFolder(code)
+              : ResultFolderScreenLanguage.getFailedToSaveToGallery(code),
         ),
       ),
     );
   }
 
   Future<void> _delete(_OutputItem item) async {
+    final code = Localizations.localeOf(context).languageCode;
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -203,13 +210,13 @@ class _ResultFolderScreenState extends State<ResultFolderScreen> {
           fontWeight: FontWeight.w600,
           fontSize: 14,
         ),
-        title: const Text('Delete file?'),
+        title: Text(ResultFolderScreenLanguage.getDeleteFile(code)),
         content: Text(item.name),
         actions: [
           TextButton(
             style: TextButton.styleFrom(foregroundColor: Colors.white70),
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+            child: Text(ResultFolderScreenLanguage.getCancel(code)),
           ),
           ElevatedButton.icon(
             style: ElevatedButton.styleFrom(
@@ -221,7 +228,7 @@ class _ResultFolderScreenState extends State<ResultFolderScreen> {
             ),
             onPressed: () => Navigator.of(context).pop(true),
             icon: const Icon(Icons.delete_outline, size: 18),
-            label: const Text('Delete'),
+            label: Text(ResultFolderScreenLanguage.getDelete(code)),
           ),
         ],
       ),
@@ -239,6 +246,7 @@ class _ResultFolderScreenState extends State<ResultFolderScreen> {
   Future<void> _deleteSelected() async {
     if (_selectedPaths.isEmpty) return;
 
+    final code = Localizations.localeOf(context).languageCode;
     final count = _selectedPaths.length;
     final ok = await showDialog<bool>(
       context: context,
@@ -258,13 +266,13 @@ class _ResultFolderScreenState extends State<ResultFolderScreen> {
           fontWeight: FontWeight.w600,
           fontSize: 14,
         ),
-        title: const Text('Delete selected files?'),
-        content: Text('$count selected'),
+        title: Text(ResultFolderScreenLanguage.getDeleteSelectedFiles(code)),
+        content: Text('$count ${ResultFolderScreenLanguage.getSelected(code)}'),
         actions: [
           TextButton(
             style: TextButton.styleFrom(foregroundColor: Colors.white70),
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+            child: Text(ResultFolderScreenLanguage.getCancel(code)),
           ),
           ElevatedButton.icon(
             style: ElevatedButton.styleFrom(
@@ -276,7 +284,7 @@ class _ResultFolderScreenState extends State<ResultFolderScreen> {
             ),
             onPressed: () => Navigator.of(context).pop(true),
             icon: const Icon(Icons.delete_outline, size: 18),
-            label: const Text('Delete'),
+            label: Text(ResultFolderScreenLanguage.getDelete(code)),
           ),
         ],
       ),
@@ -325,6 +333,7 @@ class _ResultFolderScreenState extends State<ResultFolderScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final code = Localizations.localeOf(context).languageCode;
     return WillPopScope(
       onWillPop: () async {
         if (_selectionMode) {
@@ -340,8 +349,8 @@ class _ResultFolderScreenState extends State<ResultFolderScreen> {
           foregroundColor: Colors.white,
           title: Text(
             _selectionMode
-                ? '${_selectedPaths.length} selected'
-                : 'Result Folder',
+                ? '${_selectedPaths.length} ${ResultFolderScreenLanguage.getSelected(code)}'
+                : ResultFolderScreenLanguage.getResultFolder(code),
           ),
           actions: [
             if (!_selectionMode)
@@ -369,8 +378,8 @@ class _ResultFolderScreenState extends State<ResultFolderScreen> {
                 ),
                 child: Text(
                   _selectedPaths.length == _items.length
-                      ? 'Clear'
-                      : 'Select all',
+                      ? ResultFolderScreenLanguage.getClear(code)
+                      : ResultFolderScreenLanguage.getSelectAll(code),
                 ),
               )
             else
@@ -383,11 +392,11 @@ class _ResultFolderScreenState extends State<ResultFolderScreen> {
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
             children: [
-              const Padding(
-                padding: EdgeInsets.only(bottom: 10),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
                 child: Text(
-                  'Your exports are saved here inside the app.\nAlso saved to Gallery: Pictures/ImageConverter',
-                  style: TextStyle(color: Colors.white54, fontSize: 12),
+                  ResultFolderScreenLanguage.getSavedToPhoneDesc(code),
+                  style: const TextStyle(color: Colors.white54, fontSize: 12),
                 ),
               ),
               if (_loading)
@@ -402,12 +411,15 @@ class _ResultFolderScreenState extends State<ResultFolderScreen> {
                   ),
                 )
               else if (_items.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.only(top: 24),
+                Padding(
+                  padding: const EdgeInsets.only(top: 24),
                   child: Center(
                     child: Text(
-                      'No files yet.',
-                      style: TextStyle(color: Colors.white70, fontSize: 16),
+                      ResultFolderScreenLanguage.getNoFilesYet(code),
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 16,
+                      ),
                     ),
                   ),
                 )
@@ -521,22 +533,33 @@ class _ResultFolderScreenState extends State<ResultFolderScreen> {
                                     _menuItem(
                                       value: 'open',
                                       icon: Icons.open_in_new,
-                                      label: 'Open',
+                                      label: ResultFolderScreenLanguage.getOpen(
+                                        code,
+                                      ),
                                     ),
                                     _menuItem(
                                       value: 'download',
                                       icon: Icons.download,
-                                      label: 'Download to Phone',
+                                      label:
+                                          ResultFolderScreenLanguage.getDownloadToPhone(
+                                            code,
+                                          ),
                                     ),
                                     _menuItem(
                                       value: 'share',
                                       icon: Icons.share,
-                                      label: 'Share',
+                                      label:
+                                          ResultFolderScreenLanguage.getShare(
+                                            code,
+                                          ),
                                     ),
                                     _menuItem(
                                       value: 'delete',
                                       icon: Icons.delete_outline,
-                                      label: 'Delete',
+                                      label:
+                                          ResultFolderScreenLanguage.getDelete(
+                                            code,
+                                          ),
                                       color: const Color(0xFFFF6B6B),
                                     ),
                                   ],

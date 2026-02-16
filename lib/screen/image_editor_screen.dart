@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image/image.dart' as img;
+import '../language/image_editor_screen_language.dart';
 import 'crop_image_screen.dart';
 import '../services/app_settings.dart';
 import '../services/image_processing_service.dart';
@@ -11,7 +12,7 @@ import '../services/gallery_save_service.dart';
 import '../services/multipleimagelogic.dart';
 import '../services/models.dart';
 import '../services/output_storage_service.dart';
-import '../services/pdf_export_service.dart';
+// import '../services/pdf_export_service.dart';
 
 List<int> _decodeImageSize(Uint8List bytes) {
   try {
@@ -77,10 +78,7 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
   );
 
   final ScrollController _scrollController = ScrollController();
-  late final PdfExportService _pdfExportService = PdfExportService(
-    imageProcessingService: _imageProcessingService,
-  );
-
+  final ScrollController _chipsScrollController = ScrollController();
   late List<SelectedImage> _images;
   int _activeIndex = 0;
   OutputFormat _activeInputFormat = OutputFormat.jpg;
@@ -104,8 +102,6 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
 
   Uint8List? _afterBytes;
   Uint8List? _afterSaveBytes;
-  OutputFormat? _afterSaveFormat;
-  int? _afterSaveIndex;
   int? _afterWidth;
   int? _afterHeight;
   final Map<int, _PreviewOut> _previewByIndex = <int, _PreviewOut>{};
@@ -113,6 +109,8 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
   String? _previewError;
   bool _previewDirty = true;
   bool _isSaving = false;
+
+  final Set<int> _savedIndices = <int>{};
 
   int _saveDone = 0;
   int _saveTotal = 0;
@@ -332,15 +330,18 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
   @override
   void dispose() {
     _scrollController.dispose();
+    _chipsScrollController.dispose();
     _widthController.dispose();
     _heightController.dispose();
     super.dispose();
   }
 
   void _init() {
+    debugPrint('ImageEditorScreen _init: _images.length = ${_images.length}');
     _activeIndex = 0;
     _activeInputFormat = _detectInputFormat(_images.first.name);
 
+    _savedIndices.clear();
     _formatByIndex.clear();
     if (!_isMultiSession) {
       for (var i = 0; i < _images.length; i++) {
@@ -362,8 +363,6 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
 
     _afterBytes = null;
     _afterSaveBytes = null;
-    _afterSaveFormat = null;
-    _afterSaveIndex = null;
     _afterWidth = null;
     _afterHeight = null;
     _previewByIndex.clear();
@@ -394,8 +393,6 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
       _previewDirty = true;
       _afterBytes = null;
       _afterSaveBytes = null;
-      _afterSaveFormat = null;
-      _afterSaveIndex = null;
       _afterWidth = null;
       _afterHeight = null;
       _previewByIndex.remove(_activeIndex);
@@ -431,9 +428,51 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
   }
 
   Future<void> _onSaveAll() async {
-    if (!_isMultiSession) return;
-    if (_isSaving) return;
     if (_images.isEmpty) return;
+    if (_isSaving) return;
+
+    // Check if any images are not marked as done
+    if (_savedIndices.length < _images.length) {
+      final code = Localizations.localeOf(context).languageCode;
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: ImageEditorScreen.card,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+            side: const BorderSide(color: Color(0x38E2C078)),
+          ),
+          title: const Text(
+            'Save All Images?',
+            style: TextStyle(color: Colors.white),
+          ),
+          content: Text(
+            'Some images are not marked as done. Do you want to save all ${_images.length} images now?',
+            style: const TextStyle(color: Colors.white70),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text(
+                ImageEditorScreenLanguage.getCancel(code),
+                style: const TextStyle(color: Colors.white70),
+              ),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: ImageEditorScreen.gold,
+              ),
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text(
+                'Save All',
+                style: TextStyle(color: Colors.black),
+              ),
+            ),
+          ],
+        ),
+      );
+      if (ok != true) return;
+    }
 
     setState(() {
       _isSaving = true;
@@ -501,77 +540,22 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
 
   Future<void> _saveActiveImage() async {
     final index = _activeIndex;
-    final image = _images[index];
-    final effectiveFormat = _effectiveFormatForIndex(index);
+    setState(() {
+      _savedIndices.add(index);
+    });
 
-    final cachedBytes =
-        (_afterSaveIndex == index && _afterSaveFormat == effectiveFormat)
-        ? _afterSaveBytes
-        : null;
-
-    if (_images.length > 1 && effectiveFormat == OutputFormat.pdf) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('PDF is available for single image only.'),
-        ),
-      );
+    if (index < _images.length - 1) {
+      _setActiveIndex(index + 1);
       return;
     }
 
-    final options = _optionsForIndex(index: index, format: effectiveFormat);
-    final canPreserveExif =
-        options.keepExif && !_cropped && effectiveFormat != OutputFormat.pdf;
-
-    if (effectiveFormat == OutputFormat.pdf) {
-      final pdfBytes =
-          cachedBytes ??
-          await _pdfExportService.buildPdf(images: [image], options: options);
-
-      final stamp = _timestamp();
-      final fileName = 'PDF_$stamp.pdf';
-      final saved = await _outputStorageService.saveBytes(
-        fileName: fileName,
-        bytes: pdfBytes,
-      );
-
-      final ok = await _gallerySaveService.saveFile(filePath: saved.path);
-      if (!ok && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'PDF saved in Result Folder. Gallery save supports images only.',
-            ),
-          ),
-        );
-      }
-      return;
-    }
-
-    final bytes =
-        cachedBytes ??
-        await _encodeFinalImageBytes(
-          image: image,
-          options: options,
-          canPreserveExif: canPreserveExif,
-        );
-
-    final stamp = _timestamp();
-    final label = _formatLabel(effectiveFormat);
-    final ext = _formatExt(effectiveFormat);
-    final suffix = _images.length == 1 ? '' : '_${index + 1}';
-    final fileName = '${label}_$stamp$suffix.$ext';
-
-    await _outputStorageService.saveBytes(fileName: fileName, bytes: bytes);
-
-    final ok = await _gallerySaveService.saveImage(
-      bytes: bytes,
-      name: fileName,
+    // If it's the last image, we can just show a message or keep it as is
+    // as per user request to only save via "Save All"
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('All images marked as ready. Tap Save All to finish.'),
+      ),
     );
-    if (!ok && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Saved, but failed to add to gallery.')),
-      );
-    }
   }
 
   Future<void> _saveAllImages() async {
@@ -749,8 +733,6 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
       setState(() {
         _afterBytes = out.bytes;
         _afterSaveBytes = null;
-        _afterSaveFormat = out.saveFormat;
-        _afterSaveIndex = _activeIndex;
         _afterWidth = out.width ?? beforeW;
         _afterHeight = out.height ?? beforeH;
         _isPreviewLoading = false;
@@ -765,8 +747,6 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
       setState(() {
         _afterBytes = null;
         _afterSaveBytes = null;
-        _afterSaveFormat = null;
-        _afterSaveIndex = null;
         _afterWidth = null;
         _afterHeight = null;
         _isPreviewLoading = false;
@@ -856,8 +836,6 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
       _beforeHeight = null;
       _afterBytes = null;
       _afterSaveBytes = null;
-      _afterSaveFormat = null;
-      _afterSaveIndex = null;
       _afterWidth = null;
       _afterHeight = null;
       _previewError = null;
@@ -865,26 +843,30 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
       _stage = _EditorStage.edit;
     });
 
+    // Auto-scroll the chips list to the active image
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_chipsScrollController.hasClients) {
+        final double target =
+            (index * 110.0) - 100.0; // Estimate chip width + padding
+        _chipsScrollController.animateTo(
+          target.clamp(0.0, _chipsScrollController.position.maxScrollExtent),
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        );
+      }
+    });
+
     unawaited(_loadActiveImageMeta());
   }
 
   Future<void> _onCrop() async {
-    if (_images.length != 1) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Crop is available for single image only.'),
-        ),
-      );
-      return;
-    }
-
-    final original = _images.first;
+    final original = _activeImage;
     final originalFormat = _detectInputFormat(original.name);
     final originalMaxBytes = original.bytes.length;
 
     final cropped = await Navigator.of(context).push<Uint8List>(
       MaterialPageRoute(
-        builder: (context) => CropImageScreen(bytes: _images.first.bytes),
+        builder: (context) => CropImageScreen(bytes: original.bytes),
       ),
     );
 
@@ -933,17 +915,15 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
     }
 
     setState(() {
-      _cropped = true;
-      _images = [SelectedImage(name: _images.first.name, bytes: nextBytes)];
-      _activeIndex = 0;
-      _activeInputFormat = _detectInputFormat(_images.first.name);
-      _dimsByIndex.clear();
+      _images[_activeIndex] = SelectedImage(
+        name: original.name,
+        bytes: nextBytes,
+      );
+      _activeInputFormat = _detectInputFormat(original.name);
       _beforeWidth = null;
       _beforeHeight = null;
       _afterBytes = null;
       _afterSaveBytes = null;
-      _afterSaveFormat = null;
-      _afterSaveIndex = null;
       _afterWidth = null;
       _afterHeight = null;
       _previewError = null;
@@ -1048,8 +1028,6 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
           _beforeHeight = null;
           _afterBytes = null;
           _afterSaveBytes = null;
-          _afterSaveFormat = null;
-          _afterSaveIndex = null;
           _afterWidth = null;
           _afterHeight = null;
           _previewError = null;
@@ -1207,29 +1185,33 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
       );
     }
 
-    final before = _activeImage.bytes;
-    final after = _afterBytes;
-    final afterSave = _afterSaveBytes;
-    final afterError = _previewError;
+    final String code = Localizations.localeOf(context).languageCode;
+    final bool isPreview =
+        _stage == _EditorStage.previewOne || _stage == _EditorStage.previewAll;
 
-    final multiState = _activeMultiState;
-    final compressEnabled = _isMultiSession
+    final Uint8List before = _activeImage.bytes;
+    final Uint8List? after = _afterBytes;
+    final Uint8List? afterSave = _afterSaveBytes;
+    final String? afterError = _previewError;
+
+    final MultiImageItemState? multiState = _activeMultiState;
+    final bool compressEnabled = _isMultiSession
         ? (multiState?.compressEnabled ?? true)
         : _compressEnabled;
-    final resizeEnabled = _isMultiSession
+    final bool resizeEnabled = _isMultiSession
         ? (multiState?.resizeEnabled ?? false)
         : _resizeEnabled;
-    final keepExif = _isMultiSession
+    final bool keepExif = _isMultiSession
         ? (multiState?.keepExif ?? false)
         : _keepExif;
-    final qualityValue = _isMultiSession
+    final double qualityValue = _isMultiSession
         ? (multiState?.quality ?? 80)
         : _quality;
 
-    final beforeW = _beforeWidth;
-    final beforeH = _beforeHeight;
-    final afterWidth = _afterWidth;
-    final afterHeight = _afterHeight;
+    final int? beforeW = _beforeWidth;
+    final int? beforeH = _beforeHeight;
+    final int? afterWidth = _afterWidth;
+    final int? afterHeight = _afterHeight;
 
     return Scaffold(
       backgroundColor: ImageEditorScreen.bg,
@@ -1238,16 +1220,23 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
         foregroundColor: Colors.white,
         elevation: 0,
         title: Text(
-          _isMultiSession
-              ? 'Image ${_activeIndex + 1}/${_images.length}'
-              : _images.first.name,
+          isPreview
+              ? ImageEditorScreenLanguage.getPreview(code)
+              : '${ImageEditorScreenLanguage.getImage(code)} ${_activeIndex + 1}/${_images.length}',
           style: const TextStyle(fontWeight: FontWeight.w700),
         ),
         actions: [
-          IconButton(
-            onPressed: () => Navigator.of(context).popUntil((r) => r.isFirst),
-            icon: const Icon(Icons.close),
-          ),
+          if (!_isSaving)
+            TextButton(
+              onPressed: _onDone,
+              child: Text(
+                ImageEditorScreenLanguage.getDone(code),
+                style: const TextStyle(
+                  color: ImageEditorScreen.gold,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
         ],
       ),
       bottomNavigationBar: SafeArea(
@@ -1260,45 +1249,25 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
           child: Row(
             children: [
               if (_stage != _EditorStage.edit)
-                TextButton.icon(
-                  onPressed: _goToEditStage,
-                  icon: const Icon(
-                    Icons.arrow_back,
-                    color: ImageEditorScreen.gold,
-                  ),
-                  label: const Text(
-                    'Back',
-                    style: TextStyle(color: Colors.white),
+                Expanded(
+                  child: TextButton.icon(
+                    onPressed: _goToEditStage,
+                    icon: const Icon(
+                      Icons.arrow_back,
+                      color: ImageEditorScreen.gold,
+                    ),
+                    label: Text(
+                      ImageEditorScreenLanguage.getBack(code),
+                      style: const TextStyle(color: Colors.white),
+                    ),
                   ),
                 )
               else ...[
-                if (_images.length == 1) ...[
-                  TextButton.icon(
-                    onPressed: _onCrop,
-                    icon: const Icon(Icons.crop, color: ImageEditorScreen.gold),
-                    label: const Text(
-                      'Crop',
-                      style: TextStyle(color: Colors.white),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                ],
-                TextButton.icon(
-                  onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(Icons.image, color: ImageEditorScreen.gold),
-                  label: const Text(
-                    'Change',
-                    style: TextStyle(color: Colors.white),
-                  ),
-                ),
-              ],
-              const Spacer(),
-              if (_isMultiSession && _stage == _EditorStage.edit) ...[
-                if (_isSaving && _saveTotal > 0)
-                  SizedBox(
+                Expanded(
+                  child: SizedBox(
                     height: 44,
                     child: ElevatedButton.icon(
-                      onPressed: null,
+                      onPressed: _onCrop,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF1F1D2F),
                         foregroundColor: Colors.white,
@@ -1306,35 +1275,133 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
                           borderRadius: BorderRadius.circular(14),
                           side: const BorderSide(color: Color(0x38E2C078)),
                         ),
+                        padding: EdgeInsets.zero,
                       ),
-                      icon: const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
+                      icon: const Icon(
+                        Icons.crop,
+                        size: 20,
+                        color: ImageEditorScreen.gold,
                       ),
                       label: FittedBox(
                         fit: BoxFit.scaleDown,
                         child: Text(
-                          '${_saveDone.clamp(0, _saveTotal)}/$_saveTotal',
+                          ImageEditorScreenLanguage.getCrop(code),
                           style: const TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+              const SizedBox(width: 8),
+              if (_isMultiSession && _stage == _EditorStage.edit) ...[
+                if (_isSaving && _saveTotal > 0)
+                  Expanded(
+                    child: SizedBox(
+                      height: 44,
+                      child: ElevatedButton.icon(
+                        onPressed: null,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF1F1D2F),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            side: const BorderSide(color: Color(0x38E2C078)),
+                          ),
+                          padding: EdgeInsets.zero,
+                        ),
+                        icon: const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        ),
+                        label: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            '${_saveDone.clamp(0, _saveTotal)}/$_saveTotal',
+                            style: const TextStyle(fontWeight: FontWeight.w800),
+                          ),
                         ),
                       ),
                     ),
                   )
                 else ...[
-                  SizedBox(
+                  Expanded(
+                    child: SizedBox(
+                      height: 44,
+                      child: ElevatedButton.icon(
+                        onPressed: _isSaving ? null : _saveActiveImage,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: ImageEditorScreen.gold,
+                          foregroundColor: Colors.black,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          padding: EdgeInsets.zero,
+                        ),
+                        icon: _isSaving
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.black,
+                                ),
+                              )
+                            : const Icon(Icons.check, size: 20),
+                        label: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            ImageEditorScreenLanguage.getSave(code),
+                            style: const TextStyle(fontWeight: FontWeight.w800),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: SizedBox(
+                      height: 44,
+                      child: ElevatedButton.icon(
+                        onPressed: _isSaving ? null : _onSaveAll,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF1F1D2F),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            side: const BorderSide(color: Color(0x38E2C078)),
+                          ),
+                          padding: EdgeInsets.zero,
+                        ),
+                        icon: const Icon(Icons.done_all, size: 20),
+                        label: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            ImageEditorScreenLanguage.getSaveAll(code),
+                            style: const TextStyle(fontWeight: FontWeight.w800),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ] else
+                Expanded(
+                  child: SizedBox(
                     height: 44,
                     child: ElevatedButton.icon(
-                      onPressed: _isSaving ? null : _onDone,
+                      onPressed: _isSaving ? null : _saveActiveImage,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: ImageEditorScreen.gold,
                         foregroundColor: Colors.black,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),
                         ),
+                        padding: EdgeInsets.zero,
                       ),
                       icon: _isSaving
                           ? const SizedBox(
@@ -1345,72 +1412,17 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
                                 color: Colors.black,
                               ),
                             )
-                          : const Icon(Icons.check),
-                      label: const Text(
-                        'Save',
-                        style: TextStyle(fontWeight: FontWeight.w800),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  SizedBox(
-                    height: 44,
-                    child: ElevatedButton.icon(
-                      onPressed: _isSaving ? null : _onSaveAll,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF1F1D2F),
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          side: const BorderSide(color: Color(0x38E2C078)),
-                        ),
-                      ),
-                      icon: const Icon(Icons.done_all),
-                      label: const FittedBox(
+                          : const Icon(Icons.check, size: 20),
+                      label: FittedBox(
                         fit: BoxFit.scaleDown,
                         child: Text(
-                          'Save All',
-                          style: TextStyle(fontWeight: FontWeight.w800),
+                          _isSaving
+                              ? (_saveTotal > 0
+                                    ? '${ImageEditorScreenLanguage.getSaving(code)} ${_saveDone.clamp(0, _saveTotal)}/$_saveTotal'
+                                    : ImageEditorScreenLanguage.getSaving(code))
+                              : ImageEditorScreenLanguage.getSave(code),
+                          style: const TextStyle(fontWeight: FontWeight.w800),
                         ),
-                      ),
-                    ),
-                  ),
-                ],
-              ] else
-                SizedBox(
-                  height: 44,
-                  child: ElevatedButton.icon(
-                    onPressed: _isSaving ? null : _onDone,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: ImageEditorScreen.gold,
-                      foregroundColor: Colors.black,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                    icon: _isSaving
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.black,
-                            ),
-                          )
-                        : const Icon(Icons.check),
-                    label: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text(
-                        _isSaving
-                            ? (_saveTotal > 0
-                                  ? 'Saving ${_saveDone.clamp(0, _saveTotal)}/$_saveTotal'
-                                  : 'Saving')
-                            : (_stage == _EditorStage.previewOne
-                                  ? 'Save'
-                                  : (_stage == _EditorStage.previewAll
-                                        ? 'Save All'
-                                        : (_isMulti ? 'Save' : 'Done'))),
-                        style: const TextStyle(fontWeight: FontWeight.w800),
                       ),
                     ),
                   ),
@@ -1429,17 +1441,36 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
                 SizedBox(
                   height: 40,
                   child: ListView.builder(
+                    controller: _chipsScrollController,
                     scrollDirection: Axis.horizontal,
                     itemCount: _images.length,
                     itemBuilder: (context, i) {
                       final selected = i == _activeIndex;
+                      final isSaved = _savedIndices.contains(i);
                       return Padding(
                         padding: EdgeInsets.only(
                           right: i == _images.length - 1 ? 0 : 10,
                         ),
                         child: ChoiceChip(
                           selected: selected,
-                          label: Text('Image ${i + 1}'),
+                          label: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '${ImageEditorScreenLanguage.getImage(code)} ${i + 1}',
+                              ),
+                              if (isSaved) ...[
+                                const SizedBox(width: 4),
+                                Icon(
+                                  Icons.check_circle,
+                                  size: 16,
+                                  color: selected
+                                      ? Colors.black
+                                      : ImageEditorScreen.gold,
+                                ),
+                              ],
+                            ],
+                          ),
                           labelStyle: TextStyle(
                             color: selected ? Colors.black : Colors.white,
                             fontWeight: FontWeight.w800,
@@ -1463,34 +1494,34 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
                       bottom: i == _images.length - 1 ? 0 : 12,
                     ),
                     child: _PreviewCard(
-                      title: 'Image ${i + 1}',
+                      title:
+                          '${ImageEditorScreenLanguage.getImage(code)} ${i + 1}',
                       bytes: out?.bytes,
                       width: out?.width,
                       height: out?.height,
-                      sizeLabel: out == null
+                      sizeLabel: (out?.saveBytes == null
                           ? '--'
-                          : (out.saveBytes == null
-                                ? '--'
-                                : _bytesLabel(out.saveBytes!.length)),
-                      errorText: out == null ? 'Preview missing' : null,
+                          : _bytesLabel(out!.saveBytes!.length)),
+                      errorText: out == null
+                          ? ImageEditorScreenLanguage.getPreviewMissing(code)
+                          : null,
                     ),
                   );
                 })
               else if (_stage == _EditorStage.previewOne)
                 _PreviewCard(
-                  title: 'After',
+                  title: ImageEditorScreenLanguage.getAfter(code),
                   bytes: after,
                   width: afterWidth,
                   height: afterHeight,
-                  sizeLabel: afterSave == null
+                  sizeLabel: (afterSave == null
                       ? '--'
-                      : _bytesLabel(afterSave.length),
-                  loading: _isPreviewLoading,
+                      : _bytesLabel(afterSave.length)),
                   errorText: afterError,
                 )
               else
                 _PreviewCard(
-                  title: 'Before',
+                  title: ImageEditorScreenLanguage.getBefore(code),
                   bytes: before,
                   width: beforeW,
                   height: beforeH,
@@ -1499,11 +1530,11 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
               const SizedBox(height: 16),
               if (_stage != _EditorStage.edit) ...[
                 _SectionCard(
-                  title: 'Preview',
+                  title: ImageEditorScreenLanguage.getPreview(code),
                   icon: Icons.visibility,
-                  child: const Text(
-                    'If you want to change settings, tap Back.',
-                    style: TextStyle(
+                  child: Text(
+                    ImageEditorScreenLanguage.getChangeSettingsDesc(code),
+                    style: const TextStyle(
                       color: Colors.white70,
                       fontWeight: FontWeight.w600,
                     ),
@@ -1515,7 +1546,7 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
                 ...[]
               else ...[
                 _SectionCard(
-                  title: 'Compress Photo',
+                  title: ImageEditorScreenLanguage.getCompressPhoto(code),
                   icon: Icons.compress,
                   trailing: Switch(
                     value: compressEnabled,
@@ -1537,9 +1568,9 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
                     children: [
                       Row(
                         children: [
-                          const Text(
-                            'Quality',
-                            style: TextStyle(
+                          Text(
+                            ImageEditorScreenLanguage.getQuality(code),
+                            style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.w700,
                             ),
@@ -1579,7 +1610,7 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
                 ),
                 const SizedBox(height: 12),
                 _SectionCard(
-                  title: 'Resize Resolution',
+                  title: ImageEditorScreenLanguage.getResizeResolution(code),
                   icon: Icons.photo_size_select_large,
                   trailing: Switch(
                     value: resizeEnabled,
@@ -1605,13 +1636,13 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
                           enabled: resizeEnabled,
                           keyboardType: TextInputType.number,
                           style: const TextStyle(color: Colors.white),
-                          decoration: const InputDecoration(
-                            labelText: 'Width',
-                            labelStyle: TextStyle(color: Colors.white70),
-                            enabledBorder: UnderlineInputBorder(
+                          decoration: InputDecoration(
+                            labelText: ImageEditorScreenLanguage.getWidth(code),
+                            labelStyle: const TextStyle(color: Colors.white70),
+                            enabledBorder: const UnderlineInputBorder(
                               borderSide: BorderSide(color: Colors.white24),
                             ),
-                            focusedBorder: UnderlineInputBorder(
+                            focusedBorder: const UnderlineInputBorder(
                               borderSide: BorderSide(
                                 color: ImageEditorScreen.gold,
                               ),
@@ -1630,13 +1661,15 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
                           enabled: resizeEnabled,
                           keyboardType: TextInputType.number,
                           style: const TextStyle(color: Colors.white),
-                          decoration: const InputDecoration(
-                            labelText: 'Height',
-                            labelStyle: TextStyle(color: Colors.white70),
-                            enabledBorder: UnderlineInputBorder(
+                          decoration: InputDecoration(
+                            labelText: ImageEditorScreenLanguage.getHeight(
+                              code,
+                            ),
+                            labelStyle: const TextStyle(color: Colors.white70),
+                            enabledBorder: const UnderlineInputBorder(
                               borderSide: BorderSide(color: Colors.white24),
                             ),
-                            focusedBorder: UnderlineInputBorder(
+                            focusedBorder: const UnderlineInputBorder(
                               borderSide: BorderSide(
                                 color: ImageEditorScreen.gold,
                               ),
@@ -1653,7 +1686,7 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
                 ),
                 const SizedBox(height: 12),
                 _SectionCard(
-                  title: 'Convert Format',
+                  title: ImageEditorScreenLanguage.getConvertFormat(code),
                   icon: Icons.autorenew,
                   child: SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
@@ -1667,7 +1700,9 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
                                 : (_formatByIndex[_activeIndex]
                                           ?.useSameAsInput ??
                                       true),
-                            label: const Text('SAME'),
+                            label: Text(
+                              ImageEditorScreenLanguage.getSame(code),
+                            ),
                             labelStyle: TextStyle(
                               color:
                                   (_isMultiSession
@@ -1726,7 +1761,9 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
                                 padding: const EdgeInsets.only(right: 10),
                                 child: ChoiceChip(
                                   selected: selected,
-                                  label: Text(_formatLabel(f)),
+                                  label: Text(
+                                    ImageEditorScreenLanguage.getFormatLabel(f),
+                                  ),
                                   labelStyle: TextStyle(
                                     color: selected
                                         ? Colors.black
@@ -1765,7 +1802,7 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
                 ),
                 const SizedBox(height: 12),
                 _SectionCard(
-                  title: 'Keep Exif Data',
+                  title: ImageEditorScreenLanguage.getKeepExifData(code),
                   icon: Icons.info_outline,
                   trailing: Checkbox(
                     value: keepExif,
@@ -1782,9 +1819,9 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
                       _markPreviewDirty();
                     },
                   ),
-                  child: const Text(
-                    'Best effort: works reliably only without crop.',
-                    style: TextStyle(
+                  child: Text(
+                    ImageEditorScreenLanguage.getKeepExifBestEffort(code),
+                    style: const TextStyle(
                       color: Colors.white70,
                       fontWeight: FontWeight.w600,
                     ),
@@ -1792,15 +1829,15 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
                 ),
                 const SizedBox(height: 12),
                 _SectionCard(
-                  title: 'Saved to Phone',
+                  title: ImageEditorScreenLanguage.getSavedToPhone(code),
                   icon: Icons.photo_library_outlined,
                   trailing: const Icon(
                     Icons.check_circle,
                     color: ImageEditorScreen.gold,
                   ),
-                  child: const Text(
-                    'Automatically saves to Result Folder and also to Gallery (Pictures/ImageConverter).',
-                    style: TextStyle(
+                  child: Text(
+                    ImageEditorScreenLanguage.getSavedToPhoneDesc(code),
+                    style: const TextStyle(
                       color: Colors.white70,
                       fontWeight: FontWeight.w600,
                     ),
@@ -1947,7 +1984,6 @@ class _PreviewCard extends StatelessWidget {
     required this.sizeLabel,
     this.width,
     this.height,
-    this.loading = false,
     this.errorText,
   });
 
@@ -1956,7 +1992,6 @@ class _PreviewCard extends StatelessWidget {
   final int? width;
   final int? height;
   final String sizeLabel;
-  final bool loading;
   final String? errorText;
 
   @override
@@ -1992,17 +2027,6 @@ class _PreviewCard extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              if (loading)
-                const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      ImageEditorScreen.gold,
-                    ),
-                  ),
-                ),
             ],
           ),
           const SizedBox(height: 10),

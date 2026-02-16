@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'models.dart';
 
 class MultiImageItemState {
@@ -34,6 +35,9 @@ class MultipleImageLogic {
   MultipleImageLogic({required List<SelectedImage> images})
     : images = List<SelectedImage>.from(images),
       states = List<MultiImageItemState>.generate(images.length, (i) {
+        debugPrint(
+          'MultipleImageLogic: Processing image ${i + 1}/${images.length}',
+        );
         final input = _detectInputFormat(images[i].name);
         return MultiImageItemState(
           compressEnabled: true,
@@ -45,7 +49,11 @@ class MultipleImageLogic {
           useSameAsInput: true,
           format: input,
         );
-      });
+      }) {
+    debugPrint(
+      'MultipleImageLogic: Created with ${this.images.length} images and ${states.length} states',
+    );
+  }
 
   final List<SelectedImage> images;
   final List<MultiImageItemState> states;

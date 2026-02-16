@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_pdfview/flutter_pdfview.dart';
 import 'package:open_filex/open_filex.dart';
 
+import '../language/external_open_screen_language.dart';
+import '../main.dart';
 import '../services/branded_share_service.dart';
 
 class ExternalOpenScreen extends StatefulWidget {
@@ -34,6 +36,15 @@ class _ExternalOpenScreenState extends State<ExternalOpenScreen> {
   // Sidebar animation state
   bool _showSidebar = false;
   Timer? _sidebarTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    // Enable ads for external opens (cold starts)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      GlobalAdController.showAds.value = true;
+    });
+  }
 
   @override
   void dispose() {
@@ -114,6 +125,7 @@ class _ExternalOpenScreenState extends State<ExternalOpenScreen> {
     final isImage = path.isNotEmpty && _isSupportedImage(path);
     final exists = path.isNotEmpty && File(path).existsSync();
 
+    final code = Localizations.localeOf(context).languageCode;
     return Scaffold(
       backgroundColor: ExternalOpenScreen._bg,
       appBar: AppBar(
@@ -121,7 +133,7 @@ class _ExternalOpenScreenState extends State<ExternalOpenScreen> {
         foregroundColor: Colors.white,
         elevation: 0,
         title: Text(
-          isPdf ? name : 'Open File',
+          isPdf ? name : ExternalOpenScreenLanguage.getOpenFile(code),
           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
         actions: [
@@ -149,9 +161,13 @@ class _ExternalOpenScreenState extends State<ExternalOpenScreen> {
     String path,
     String name,
   ) {
+    final code = Localizations.localeOf(context).languageCode;
     if (!exists) {
-      return const Center(
-        child: Text('File not found.', style: TextStyle(color: Colors.white70)),
+      return Center(
+        child: Text(
+          ExternalOpenScreenLanguage.getFileNotFound(code),
+          style: const TextStyle(color: Colors.white70),
+        ),
       );
     }
 
@@ -209,7 +225,7 @@ class _ExternalOpenScreenState extends State<ExternalOpenScreen> {
           if (_errorMessage.isNotEmpty)
             Center(
               child: Text(
-                'Error: $_errorMessage',
+                ExternalOpenScreenLanguage.getError(code, _errorMessage),
                 style: const TextStyle(color: Colors.redAccent),
               ),
             ),
@@ -300,9 +316,9 @@ class _ExternalOpenScreenState extends State<ExternalOpenScreen> {
             File(path),
             fit: BoxFit.contain,
             errorBuilder: (context, error, stackTrace) {
-              return const Text(
-                'Could not load image',
-                style: TextStyle(color: Colors.white70),
+              return Text(
+                ExternalOpenScreenLanguage.getCouldNotLoadImage(code),
+                style: const TextStyle(color: Colors.white70),
               );
             },
           ),
@@ -355,7 +371,9 @@ class _ExternalOpenScreenState extends State<ExternalOpenScreen> {
             child: ElevatedButton.icon(
               onPressed: _openNative,
               icon: const Icon(Icons.open_in_new),
-              label: const Text('Open with another app'),
+              label: Text(
+                ExternalOpenScreenLanguage.getOpenWithAnotherApp(code),
+              ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: ExternalOpenScreen._gold,
                 foregroundColor: Colors.black,
@@ -372,7 +390,7 @@ class _ExternalOpenScreenState extends State<ExternalOpenScreen> {
             child: OutlinedButton.icon(
               onPressed: _share,
               icon: const Icon(Icons.share),
-              label: const Text('Share File'),
+              label: Text(ExternalOpenScreenLanguage.getShareFile(code)),
               style: OutlinedButton.styleFrom(
                 foregroundColor: Colors.white,
                 side: const BorderSide(color: ExternalOpenScreen._gold),
@@ -387,9 +405,9 @@ class _ExternalOpenScreenState extends State<ExternalOpenScreen> {
             onPressed: () => Navigator.of(
               context,
             ).pushNamedAndRemoveUntil('/home', (route) => false),
-            child: const Text(
-              'Go to Home',
-              style: TextStyle(color: Colors.white70),
+            child: Text(
+              ExternalOpenScreenLanguage.getGoToHome(code),
+              style: const TextStyle(color: Colors.white70),
             ),
           ),
         ],

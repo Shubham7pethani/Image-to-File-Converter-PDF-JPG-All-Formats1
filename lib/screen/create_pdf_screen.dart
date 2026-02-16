@@ -4,6 +4,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../language/create_pdf_screen_language.dart';
+import 'home_screen.dart';
 import '../services/app_settings.dart';
 import '../services/models.dart';
 import 'pdf_pages_editor.dart';
@@ -23,7 +25,7 @@ class _CreatePdfScreenState extends State<CreatePdfScreen> {
   final AppSettings _settings = const AppSettings();
   bool _isLoading = false;
 
-  static const int _maxPdfImages = 150;
+  static const int _maxPdfImages = 1000;
 
   List<SelectedImage> _dedupeImages(List<SelectedImage> images) {
     final seen = <String>{};
@@ -38,39 +40,7 @@ class _CreatePdfScreenState extends State<CreatePdfScreen> {
   }
 
   String _fingerprint(SelectedImage img) {
-    final bytes = img.bytes;
-    final len = bytes.length;
-    const sampleSize = 4096;
-    final takeFront = len < sampleSize ? len : sampleSize;
-    final takeBack = len < sampleSize ? 0 : sampleSize;
-
-    int hash = 0x811c9dc5;
-    hash = _fnv1aInt(hash, len);
-    hash = _fnv1a(hash, bytes.sublist(0, takeFront));
-    if (takeBack > 0) {
-      hash = _fnv1a(hash, bytes.sublist(len - takeBack));
-    }
-    return '$len|$hash';
-  }
-
-  int _fnv1a(int hash, List<int> data) {
-    for (final b in data) {
-      hash ^= (b & 0xff);
-      hash = (hash * 0x01000193) & 0xffffffff;
-    }
-    return hash;
-  }
-
-  int _fnv1aInt(int hash, int value) {
-    hash ^= (value & 0xff);
-    hash = (hash * 0x01000193) & 0xffffffff;
-    hash ^= ((value >> 8) & 0xff);
-    hash = (hash * 0x01000193) & 0xffffffff;
-    hash ^= ((value >> 16) & 0xff);
-    hash = (hash * 0x01000193) & 0xffffffff;
-    hash ^= ((value >> 24) & 0xff);
-    hash = (hash * 0x01000193) & 0xffffffff;
-    return hash;
+    return '${img.name}_${img.bytes.length}';
   }
 
   Future<void> _withLoader(Future<void> Function() action) async {
@@ -116,24 +86,12 @@ class _CreatePdfScreenState extends State<CreatePdfScreen> {
       if (!mounted) return;
       if (files.isEmpty) return;
 
-      final cappedFiles = files.length > _maxPdfImages
-          ? files.take(_maxPdfImages).toList()
-          : files;
-
-      if (files.length > _maxPdfImages) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Selected more than 150 images. Using first 150.'),
-          ),
-        );
-      }
-
       final images = <SelectedImage>[];
       var i = 0;
-      for (final f in cappedFiles) {
+      for (final f in files) {
         images.add(SelectedImage(name: f.name, bytes: await f.readAsBytes()));
         i++;
-        if (i % 2 == 0) {
+        if (i % 5 == 0) {
           await Future<void>.delayed(Duration.zero);
         }
       }
@@ -166,24 +124,13 @@ class _CreatePdfScreenState extends State<CreatePdfScreen> {
         }
       }
 
-      if (images.length > _maxPdfImages) {
-        final capped = images.take(_maxPdfImages).toList();
-        images
-          ..clear()
-          ..addAll(capped);
-
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Selected more than 150 images. Using first 150.'),
-          ),
-        );
-      }
-
       if (images.isEmpty) {
         if (!mounted) return;
+        final code = Localizations.localeOf(context).languageCode;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Unable to read selected file(s).')),
+          SnackBar(
+            content: Text(CreatePdfScreenLanguage.getUnableToReadFile(code)),
+          ),
         );
         return;
       }
@@ -197,6 +144,7 @@ class _CreatePdfScreenState extends State<CreatePdfScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final code = Localizations.localeOf(context).languageCode;
     return Scaffold(
       backgroundColor: CreatePdfScreen.bg,
       appBar: AppBar(
@@ -207,42 +155,67 @@ class _CreatePdfScreenState extends State<CreatePdfScreen> {
           icon: const Icon(Icons.close),
           onPressed: () => Navigator.of(context).maybePop(),
         ),
-        title: const Text(
-          'Choose Photos for PDF',
-          style: TextStyle(fontWeight: FontWeight.w700),
+        title: Text(
+          CreatePdfScreenLanguage.getChoosePhotosForPdf(code),
+          style: const TextStyle(fontWeight: FontWeight.w700),
         ),
       ),
       body: Stack(
         children: [
-          Padding(
-            padding: const EdgeInsets.all(24),
-            child: GridView.count(
-              crossAxisCount: 2,
-              mainAxisSpacing: 26,
-              crossAxisSpacing: 26,
-              children: [
-                _ChooseTile(
-                  icon: Icons.photo_camera_rounded,
-                  label: 'Camera',
-                  onTap: _pickFromCamera,
+          Column(
+            children: [
+              Expanded(
+                child: GridView.count(
+                  crossAxisCount: 2,
+                  mainAxisSpacing: 26,
+                  crossAxisSpacing: 26,
+                  padding: const EdgeInsets.all(24),
+                  children: [
+                    _ChooseTile(
+                      icon: Icons.photo_camera_rounded,
+                      label: CreatePdfScreenLanguage.getCamera(code),
+                      onTap: _pickFromCamera,
+                    ),
+                    _ChooseTile(
+                      icon: Icons.folder_rounded,
+                      label: CreatePdfScreenLanguage.getPickImage(code),
+                      onTap: _pickWithFilePicker,
+                    ),
+                    _ChooseTile(
+                      icon: Icons.photo_library_rounded,
+                      label: CreatePdfScreenLanguage.getPhotos(code),
+                      onTap: _pickFromGallery,
+                    ),
+                    _ChooseTile(
+                      icon: Icons.collections_rounded,
+                      label: CreatePdfScreenLanguage.getGallery(code),
+                      onTap: _pickFromGallery,
+                    ),
+                  ],
                 ),
-                _ChooseTile(
-                  icon: Icons.folder_rounded,
-                  label: 'Pick Image',
-                  onTap: _pickWithFilePicker,
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final w = constraints.maxWidth;
+                    final h = (w * 0.85).clamp(280.0, 360.0);
+                    return ConnectivityAdWrapper(
+                      child: Container(
+                        height: h,
+                        decoration: BoxDecoration(
+                          color: CreatePdfScreen.card,
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: const Color(0x38E2C078)),
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: const NativeAdBox(adKey: 'pdf'),
+                      ),
+                    );
+                  },
                 ),
-                _ChooseTile(
-                  icon: Icons.photo_library_rounded,
-                  label: 'Photos',
-                  onTap: _pickFromGallery,
-                ),
-                _ChooseTile(
-                  icon: Icons.collections_rounded,
-                  label: 'Gallery',
-                  onTap: _pickFromGallery,
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
           if (_isLoading)
             const ColoredBox(
