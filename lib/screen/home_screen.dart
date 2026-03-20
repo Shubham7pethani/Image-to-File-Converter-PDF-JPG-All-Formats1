@@ -235,30 +235,59 @@ class _NativeAdBoxState extends State<NativeAdBox> with WidgetsBindingObserver {
     if (!_hasConnection) {
       return const SizedBox.shrink();
     }
+
+    Widget adContent;
     if (ad != null && _loaded) {
-      return AdWidget(key: UniqueKey(), ad: ad);
-    }
-    return const Center(
-      child: SizedBox(
-        width: 56,
-        height: 56,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: Color(0xFFE2C078),
-            borderRadius: BorderRadius.all(Radius.circular(10)),
-          ),
-          child: Center(
-            child: Text(
-              'Ad',
-              style: TextStyle(
-                color: Colors.black,
-                fontWeight: FontWeight.w800,
-                fontSize: 16,
+      adContent = AdWidget(key: UniqueKey(), ad: ad);
+    } else {
+      adContent = const Center(
+        child: SizedBox(
+          width: 56,
+          height: 56,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: Color(0xFFE2C078),
+              borderRadius: BorderRadius.all(Radius.circular(10)),
+            ),
+            child: Center(
+              child: Text(
+                'Ad',
+                style: TextStyle(
+                  color: Colors.black,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 16,
+                ),
               ),
             ),
           ),
         ),
-      ),
+      );
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          decoration: const BoxDecoration(
+            color: Color(0xFFE2C078),
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(8),
+              topRight: Radius.circular(8),
+            ),
+          ),
+          child: const Text(
+            'Sponsored',
+            style: TextStyle(
+              color: Colors.black,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        Expanded(child: adContent),
+      ],
     );
   }
 }
@@ -620,32 +649,82 @@ class _HomeNativeAdBoxState extends State<_HomeNativeAdBox>
   Widget build(BuildContext context) {
     final ad = _ad;
     if (ad != null && _loaded) {
-      return SizedBox.expand(
-        child: AdWidget(key: ValueKey(ad.hashCode), ad: ad),
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            decoration: const BoxDecoration(
+              color: Color(0xFFE2C078),
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(8),
+                topRight: Radius.circular(8),
+              ),
+            ),
+            child: const Text(
+              'Sponsored',
+              style: TextStyle(
+                color: Colors.black,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          Expanded(
+            child: AdWidget(key: ValueKey(ad.hashCode), ad: ad),
+          ),
+        ],
       );
     }
 
-    return const Center(
-      child: SizedBox(
-        width: 56,
-        height: 56,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          decoration: const BoxDecoration(
             color: Color(0xFFE2C078),
-            borderRadius: BorderRadius.all(Radius.circular(10)),
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(8),
+              topRight: Radius.circular(8),
+            ),
           ),
+          child: const Text(
+            'Sponsored',
+            style: TextStyle(
+              color: Colors.black,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        const Expanded(
           child: Center(
-            child: Text(
-              'Ad',
-              style: TextStyle(
-                color: Colors.black,
-                fontWeight: FontWeight.w800,
-                fontSize: 16,
+            child: SizedBox(
+              width: 56,
+              height: 56,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: Color(0xFFE2C078),
+                  borderRadius: BorderRadius.all(Radius.circular(10)),
+                ),
+                child: Center(
+                  child: Text(
+                    'Ad',
+                    style: TextStyle(
+                      color: Colors.black,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
         ),
-      ),
+      ],
     );
   }
 }

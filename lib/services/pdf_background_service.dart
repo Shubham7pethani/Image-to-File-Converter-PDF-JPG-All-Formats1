@@ -39,7 +39,13 @@ class PdfBackgroundService {
 
     try {
       doc = await PdfDocument.openFile(path);
+    } catch (e) {
+      // If it's a password-protected PDF, we can't warm it up without the password.
+      // Since this is a background service, we just skip it.
+      return;
+    }
 
+    try {
       final count = pagesCount.value;
       final toWarm = math.min(count, math.max(0, maxPages));
 

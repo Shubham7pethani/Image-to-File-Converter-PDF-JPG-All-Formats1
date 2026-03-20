@@ -520,15 +520,43 @@ class _GlobalBannerScaffoldState extends State<_GlobalBannerScaffold> {
                   bottom: 0,
                   child: SizedBox(
                     height: reservedHeight,
-                    child: Padding(
-                      padding: EdgeInsets.only(bottom: bottomInset),
-                      child: Center(
-                        child: SizedBox(
-                          width: ad.size.width.toDouble(),
-                          height: adHeight,
-                          child: AdWidget(ad: ad),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFE2C078),
+                            borderRadius: BorderRadius.only(
+                              topLeft: Radius.circular(6),
+                              topRight: Radius.circular(6),
+                            ),
+                          ),
+                          child: const Text(
+                            'Sponsored',
+                            style: TextStyle(
+                              color: Colors.black,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                         ),
-                      ),
+                        Expanded(
+                          child: Padding(
+                            padding: EdgeInsets.only(bottom: bottomInset),
+                            child: Center(
+                              child: SizedBox(
+                                width: ad.size.width.toDouble(),
+                                height: adHeight,
+                                child: AdWidget(ad: ad),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),

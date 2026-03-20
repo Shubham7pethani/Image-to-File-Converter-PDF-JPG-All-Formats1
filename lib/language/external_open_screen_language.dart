@@ -8,6 +8,11 @@ class ExternalOpenScreenLanguage {
       'shareFile': 'Share File',
       'goToHome': 'Go to Home',
       'couldNotLoadImage': 'Could not load image',
+      'passwordRequired': 'Password Required',
+      'enterPassword': 'Enter password to open this PDF',
+      'invalidPassword': 'Invalid password. Please try again.',
+      'cancel': 'Cancel',
+      'open': 'Open',
     },
     'hi': {
       'openFile': 'फ़ाइल खोलें',
@@ -17,6 +22,11 @@ class ExternalOpenScreenLanguage {
       'shareFile': 'फ़ाइल साझा करें',
       'goToHome': 'होम पर जाएं',
       'couldNotLoadImage': 'छवि लोड नहीं की जा सकी',
+      'passwordRequired': 'पासवर्ड आवश्यक है',
+      'enterPassword': 'इस PDF को खोलने के लिए पासवर्ड दर्ज करें',
+      'invalidPassword': 'अमान्य पासवर्ड। कृपया पुन: प्रयास करें।',
+      'cancel': 'रद्द करें',
+      'open': 'खोलें',
     },
     'es': {
       'openFile': 'Abrir archivo',
@@ -26,6 +36,11 @@ class ExternalOpenScreenLanguage {
       'shareFile': 'Compartir archivo',
       'goToHome': 'Ir al inicio',
       'couldNotLoadImage': 'No se pudo cargar la imagen',
+      'passwordRequired': 'Contraseña requerida',
+      'enterPassword': 'Ingrese la contraseña para abrir este PDF',
+      'invalidPassword': 'Contraseña inválida. Por favor, inténtelo de nuevo.',
+      'cancel': 'Cancelar',
+      'open': 'Abrir',
     },
     'ps': {
       'openFile': 'فایل خلاص کړئ',
@@ -35,6 +50,11 @@ class ExternalOpenScreenLanguage {
       'shareFile': 'فایل شریک کړئ',
       'goToHome': 'کور پاڼې ته لاړ شئ',
       'couldNotLoadImage': 'انځور پورته نشو',
+      'passwordRequired': 'پټنوم ته اړتیا ده',
+      'enterPassword': 'د دې PDF خلاصولو لپاره پټنوم دننه کړئ',
+      'invalidPassword': 'ناسم پټنوم. مهرباني وکړئ بیا هڅه وکړئ.',
+      'cancel': 'لغوه کول',
+      'open': 'خلاص کړئ',
     },
     'fil': {
       'openFile': 'Buksan ang File',
@@ -44,6 +64,11 @@ class ExternalOpenScreenLanguage {
       'shareFile': 'I-share ang File',
       'goToHome': 'Pumunta sa Home',
       'couldNotLoadImage': 'Hindi ma-load ang larawan',
+      'passwordRequired': 'Kailangan ng Password',
+      'enterPassword': 'Ipasok ang password upang buksan ang PDF na ito',
+      'invalidPassword': 'Maling password. Pakisubukan muli.',
+      'cancel': 'Kanselahin',
+      'open': 'Buksan',
     },
     'id': {
       'openFile': 'Buka File',
@@ -53,6 +78,11 @@ class ExternalOpenScreenLanguage {
       'shareFile': 'Bagikan File',
       'goToHome': 'Kembali ke Beranda',
       'couldNotLoadImage': 'Tidak dapat memuat gambar',
+      'passwordRequired': 'Kata Sandi Diperlukan',
+      'enterPassword': 'Masukkan kata sandi untuk membuka PDF ini',
+      'invalidPassword': 'Kata sandi salah. Silakan coba lagi.',
+      'cancel': 'Batal',
+      'open': 'Buka',
     },
     'my': {
       'openFile': 'ဖိုင်ဖွင့်ရန်',
@@ -62,6 +92,11 @@ class ExternalOpenScreenLanguage {
       'shareFile': 'ဖိုင်မျှဝေရန်',
       'goToHome': 'ပင်မစာမျက်နှာသို့ သွားရန်',
       'couldNotLoadImage': 'ပုံကို မတင်နိုင်ပါ',
+      'passwordRequired': 'စကားဝှက်လိုအပ်သည်',
+      'enterPassword': 'ဤ PDF ကိုဖွင့်ရန် စကားဝှက်ထည့်ပါ',
+      'invalidPassword': 'စကားဝှက်မှားနေပါသည်။ ကျေးဇူးပြု၍ ထပ်မံကြိုးစားပါ။',
+      'cancel': 'ပယ်ဖျက်မည်',
+      'open': 'ဖွင့်မည်',
     },
     'ru': {
       'openFile': 'Открыть файл',
@@ -71,6 +106,11 @@ class ExternalOpenScreenLanguage {
       'shareFile': 'Поделиться файлом',
       'goToHome': 'На главную',
       'couldNotLoadImage': 'Не удалось загрузить изображение',
+      'passwordRequired': 'Требуется пароль',
+      'enterPassword': 'Введите пароль, чтобы открыть этот PDF',
+      'invalidPassword': 'Неверный пароль. Пожалуйста, попробуйте еще раз.',
+      'cancel': 'Отмена',
+      'open': 'Открыть',
     },
     'fa': {
       'openFile': 'باز کردن فایل',
@@ -80,6 +120,11 @@ class ExternalOpenScreenLanguage {
       'shareFile': 'اشتراک‌گذاری فایل',
       'goToHome': 'رفتن به خانه',
       'couldNotLoadImage': 'تصویر بارگذاری نشد',
+      'passwordRequired': 'رمز عبور لازم است',
+      'enterPassword': 'برای باز کردن این PDF رمز عبور را وارد کنید',
+      'invalidPassword': 'رمز عبور نامعتبر است. لطفاً دوباره تلاش کنید.',
+      'cancel': 'لغو',
+      'open': 'باز کردن',
     },
     'bn': {
       'openFile': 'ফাইল খুলুন',
@@ -89,6 +134,11 @@ class ExternalOpenScreenLanguage {
       'shareFile': 'ফাইল শেয়ার করুন',
       'goToHome': 'হোমে ফিরে যান',
       'couldNotLoadImage': 'ছবি লোড করা যায়নি',
+      'passwordRequired': 'পাসওয়ার্ড প্রয়োজন',
+      'enterPassword': 'এই PDF খুলতে পাসওয়ার্ড লিখুন',
+      'invalidPassword': 'ভুল পাসওয়ার্ড। আবার চেষ্টা করুন।',
+      'cancel': 'বাতিল করুন',
+      'open': 'খুলুন',
     },
     'mr': {
       'openFile': 'फाईल उघडा',
@@ -98,6 +148,11 @@ class ExternalOpenScreenLanguage {
       'shareFile': 'फाईल शेअर करा',
       'goToHome': 'होमवर जा',
       'couldNotLoadImage': 'इमेज लोड होऊ शकली नाही',
+      'passwordRequired': 'पासवर्ड आवश्यक आहे',
+      'enterPassword': 'ही PDF उघडण्यासाठी पासवर्ड टाका',
+      'invalidPassword': 'अवैध पासवर्ड. कृपया पुन्हा प्रयत्न करा.',
+      'cancel': 'रद्द करा',
+      'open': 'उघडा',
     },
     'te': {
       'openFile': 'ఫైల్‌ను ఓపెన్ చేయి',
@@ -107,6 +162,11 @@ class ExternalOpenScreenLanguage {
       'shareFile': 'ఫైల్‌ను షేర్ చేయి',
       'goToHome': 'హోమ్‌కు వెళ్లు',
       'couldNotLoadImage': 'చిత్రాన్ని లోడ్ చేయలేకపోతున్నాము',
+      'passwordRequired': 'పాస్‌వర్డ్ అవసరం',
+      'enterPassword': 'ఈ PDFని ఓపెన్ చేయడానికి పాస్‌వర్డ్ ఎంటర్ చేయండి',
+      'invalidPassword': 'తప్పు పాస్‌వర్డ్. దయచేసి మళ్ళీ ప్రయత్నించండి.',
+      'cancel': 'రద్దు చేయి',
+      'open': 'ఓపెన్ చేయి',
     },
     'ta': {
       'openFile': 'கோப்பைத் திற',
@@ -116,6 +176,11 @@ class ExternalOpenScreenLanguage {
       'shareFile': 'கோப்பைப் பகிர்',
       'goToHome': 'முகப்புக்குச் செல்',
       'couldNotLoadImage': 'படத்தை ஏற்ற முடியவில்லை',
+      'passwordRequired': 'கடவுச்சொல் தேவை',
+      'enterPassword': 'இந்த PDF-ஐத் திறக்க கடவுச்சொல்லை உள்ளிடவும்',
+      'invalidPassword': 'தவறான கடவுச்சொல். மீண்டும் முயற்சிக்கவும்.',
+      'cancel': 'ரத்து செய்',
+      'open': 'திற',
     },
     'ur': {
       'openFile': 'فائل کھولیں',
@@ -125,6 +190,11 @@ class ExternalOpenScreenLanguage {
       'shareFile': 'فائل شیئر کریں',
       'goToHome': 'ہوم پر جائیں',
       'couldNotLoadImage': 'تصویر لوڈ نہیں ہو سکی',
+      'passwordRequired': 'پاس ورڈ درکار ہے',
+      'enterPassword': 'اس پی ڈی ایف کو کھولنے کے لیے پاس ورڈ درج کریں',
+      'invalidPassword': 'غلط پاس ورڈ۔ براہ کرم دوبارہ کوشش کریں۔',
+      'cancel': 'منسوخ کریں',
+      'open': 'کھولیں',
     },
     'ms': {
       'openFile': 'Buka Fail',
@@ -134,15 +204,25 @@ class ExternalOpenScreenLanguage {
       'shareFile': 'Kongsi Fail',
       'goToHome': 'Kembali ke Halaman Utama',
       'couldNotLoadImage': 'Imej tidak dapat dimuatkan',
+      'passwordRequired': 'Kata Laluan Diperlukan',
+      'enterPassword': 'Masukkan kata laluan untuk membuka PDF ini',
+      'invalidPassword': 'Kata laluan tidak sah. Sila cuba lagi.',
+      'cancel': 'Batal',
+      'open': 'Buka',
     },
     'pt': {
       'openFile': 'Abrir Arquivo',
-      'fileNotFound': 'Arquivo não encontrado.',
+      'fileNotFound': 'Arquivo tidak encontrado.',
       'error': 'Erro: {error}',
       'openWithAnotherApp': 'Abrir com outro aplicativo',
       'shareFile': 'Compartilhar Arquivo',
       'goToHome': 'Ir para o Início',
       'couldNotLoadImage': 'Não foi possível carregar a imagem',
+      'passwordRequired': 'Senha Necessária',
+      'enterPassword': 'Digite a senha para abrir este PDF',
+      'invalidPassword': 'Senha inválida. Por favor, tente novamente.',
+      'cancel': 'Cancelar',
+      'open': 'Abrir',
     },
     'fr': {
       'openFile': 'Ouvrir le fichier',
@@ -152,6 +232,11 @@ class ExternalOpenScreenLanguage {
       'shareFile': 'Partager le fichier',
       'goToHome': 'Aller à l\'accueil',
       'couldNotLoadImage': 'Impossible de charger l\'image',
+      'passwordRequired': 'Mot de passe requis',
+      'enterPassword': 'Entrez le mot de passe pour ouvrir ce PDF',
+      'invalidPassword': 'Mot de passe invalide. Veuillez réessayer.',
+      'cancel': 'Annuler',
+      'open': 'Ouvrir',
     },
     'de': {
       'openFile': 'Datei öffnen',
@@ -161,6 +246,11 @@ class ExternalOpenScreenLanguage {
       'shareFile': 'Datei teilen',
       'goToHome': 'Zum Hauptmenü',
       'couldNotLoadImage': 'Bild konnte nicht geladen werden',
+      'passwordRequired': 'Passwort erforderlich',
+      'enterPassword': 'Geben Sie das Passwort ein, um dieses PDF zu öffnen',
+      'invalidPassword': 'Ungültiges Passwort. Bitte versuchen Sie es erneut.',
+      'cancel': 'Abbrechen',
+      'open': 'Öffnen',
     },
     'ar': {
       'openFile': 'فتح ملف',
@@ -170,6 +260,11 @@ class ExternalOpenScreenLanguage {
       'shareFile': 'مشاركة الملف',
       'goToHome': 'الذهاب إلى الرئيسية',
       'couldNotLoadImage': 'تعذر تحميل الصورة',
+      'passwordRequired': 'كلمة المرور مطلوبة',
+      'enterPassword': 'أدخل كلمة المرور لفتح هذا الملف',
+      'invalidPassword': 'كلمة المرور غير صالحة. يرجى المحاولة مرة أخرى.',
+      'cancel': 'إلغاء',
+      'open': 'فتح',
     },
     'tr': {
       'openFile': 'Dosyayı Aç',
@@ -179,6 +274,11 @@ class ExternalOpenScreenLanguage {
       'shareFile': 'Dosyayı Paylaş',
       'goToHome': 'Ana Sayfaya Git',
       'couldNotLoadImage': 'Görüntü yüklenemedi',
+      'passwordRequired': 'Şifre Gerekli',
+      'enterPassword': 'Bu PDF\'yi açmak için şifreyi girin',
+      'invalidPassword': 'Geçersiz şifre. Lütfen tekrar deneyin.',
+      'cancel': 'İptal',
+      'open': 'Aç',
     },
     'vi': {
       'openFile': 'Mở tệp',
@@ -188,6 +288,11 @@ class ExternalOpenScreenLanguage {
       'shareFile': 'Chia sẻ tệp',
       'goToHome': 'Về trang chủ',
       'couldNotLoadImage': 'Không thể tải hình ảnh',
+      'passwordRequired': 'Yêu cầu mật khẩu',
+      'enterPassword': 'Nhập mật khẩu để mở PDF này',
+      'invalidPassword': 'Mật khẩu không hợp lệ. Vui lòng thử lại.',
+      'cancel': 'Hủy',
+      'open': 'Mở',
     },
     'th': {
       'openFile': 'เปิดไฟล์',
@@ -197,6 +302,11 @@ class ExternalOpenScreenLanguage {
       'shareFile': 'แชร์ไฟล์',
       'goToHome': 'ไปที่หน้าแรก',
       'couldNotLoadImage': 'ไม่สามารถโหลดรูปภาพได้',
+      'passwordRequired': 'ต้องใช้รหัสผ่าน',
+      'enterPassword': 'ป้อนรหัสผ่านเพื่อเปิด PDF นี้',
+      'invalidPassword': 'รหัสผ่านไม่ถูกต้อง โปรดลองอีกครั้ง',
+      'cancel': 'ยกเลิก',
+      'open': 'เปิด',
     },
     'ja': {
       'openFile': 'ファイルを開く',
@@ -206,6 +316,11 @@ class ExternalOpenScreenLanguage {
       'shareFile': 'ファイルを共有',
       'goToHome': 'ホームへ',
       'couldNotLoadImage': '画像を読み込めませんでした',
+      'passwordRequired': 'パスワードが必要です',
+      'enterPassword': 'このPDFを開くにはパスワードを入力してください',
+      'invalidPassword': 'パスワードが正しくありません。もう一度お試しください。',
+      'cancel': 'キャンセル',
+      'open': '開く',
     },
     'ko': {
       'openFile': '파일 열기',
@@ -215,6 +330,11 @@ class ExternalOpenScreenLanguage {
       'shareFile': '파일 공유',
       'goToHome': '홈으로 이동',
       'couldNotLoadImage': '이미지를 불러올 수 없습니다',
+      'passwordRequired': '비밀번호 필요',
+      'enterPassword': '이 PDF를 열려면 비밀번호를 입력하세요',
+      'invalidPassword': '잘못된 비밀번호입니다. 다시 시도하세요.',
+      'cancel': '취소',
+      'open': '열기',
     },
     'it': {
       'openFile': 'Apri file',
@@ -224,6 +344,11 @@ class ExternalOpenScreenLanguage {
       'shareFile': 'Condividi file',
       'goToHome': 'Vai alla Home',
       'couldNotLoadImage': 'Impossibile caricare l\'immagine',
+      'passwordRequired': 'Password richiesta',
+      'enterPassword': 'Inserisci la password per aprire questo PDF',
+      'invalidPassword': 'Password non valida. Riprova.',
+      'cancel': 'Annulla',
+      'open': 'Apri',
     },
     'pl': {
       'openFile': 'Otwórz plik',
@@ -233,6 +358,11 @@ class ExternalOpenScreenLanguage {
       'shareFile': 'Udostępnij plik',
       'goToHome': 'Idź do strony głównej',
       'couldNotLoadImage': 'Nie udało się załadować obrazu',
+      'passwordRequired': 'Wymagane hasło',
+      'enterPassword': 'Wprowadź hasło, aby otworzyć ten plik PDF',
+      'invalidPassword': 'Nieprawidłowe hasło. Spróbuj ponownie.',
+      'cancel': 'Anuluj',
+      'open': 'Otwórz',
     },
     'uk': {
       'openFile': 'Відкрити файл',
@@ -242,6 +372,11 @@ class ExternalOpenScreenLanguage {
       'shareFile': 'Поділитися файлом',
       'goToHome': 'На головну',
       'couldNotLoadImage': 'Не вдалося завантажити зображення',
+      'passwordRequired': 'Потрібен пароль',
+      'enterPassword': 'Введіть пароль, щоб відкрити цей PDF',
+      'invalidPassword': 'Невірний пароль. Будь ласка, спробуйте ще раз.',
+      'cancel': 'Скасувати',
+      'open': 'Відкрити',
     },
     'nl': {
       'openFile': 'Bestand openen',
@@ -251,15 +386,25 @@ class ExternalOpenScreenLanguage {
       'shareFile': 'Bestand delen',
       'goToHome': 'Naar Home',
       'couldNotLoadImage': 'Afbeelding kon niet worden geladen',
+      'passwordRequired': 'Wachtwoord vereist',
+      'enterPassword': 'Voer het wachtwoord in om deze PDF te openen',
+      'invalidPassword': 'Ongeldig wachtwoord. Probeer het opnieuw.',
+      'cancel': 'Annuleren',
+      'open': 'Openen',
     },
     'ro': {
       'openFile': 'Deschidere fișier',
       'fileNotFound': 'Fișierul nu a fost găsit.',
       'error': 'Eroare: {error}',
-      'openWithAnotherApp': 'Deschideți cu altă aplicație',
+      'openWithAnotherApp': 'Deschideți cu altă aplikasiție',
       'shareFile': 'Partajați fișierul',
       'goToHome': 'Mergi la Acasă',
       'couldNotLoadImage': 'Nu s-a putut încărca imaginea',
+      'passwordRequired': 'Parolă necesară',
+      'enterPassword': 'Introduceți parola pentru a deschide acest PDF',
+      'invalidPassword': 'Parolă invalidă. Vă rugăm să încercați din nou.',
+      'cancel': 'Anulare',
+      'open': 'Deschidere',
     },
     'el': {
       'openFile': 'Άνοιγμα αρχείου',
@@ -269,6 +414,12 @@ class ExternalOpenScreenLanguage {
       'shareFile': 'Κοινοποίηση αρχείου',
       'goToHome': 'Μετάβαση στην Αρχική',
       'couldNotLoadImage': 'Αδυναμία φόρτωσης εικόνας',
+      'passwordRequired': 'Απαιτείται κωδικός πρόσβασης',
+      'enterPassword':
+          'Εισαγάγετε τον κωδικό πρόσβασης για να ανοίξετε αυτό το PDF',
+      'invalidPassword': 'Μη έγκυρος κωδικός πρόσβασης. Δοκιμάστε ξανά.',
+      'cancel': 'Ακύρωση',
+      'open': 'Άνοιγμα',
     },
     'cs': {
       'openFile': 'Otevřít soubor',
@@ -278,6 +429,11 @@ class ExternalOpenScreenLanguage {
       'shareFile': 'Sdílet soubor',
       'goToHome': 'Domů',
       'couldNotLoadImage': 'Obrázek nelze načíst',
+      'passwordRequired': 'Vyžadováno heslo',
+      'enterPassword': 'Zadejte heslo pro otevření tohoto PDF',
+      'invalidPassword': 'Neplatné heslo. Zkuste to prosím znovu.',
+      'cancel': 'Zrušit',
+      'open': 'Otevřít',
     },
     'hu': {
       'openFile': 'Fájl megnyitása',
@@ -287,6 +443,11 @@ class ExternalOpenScreenLanguage {
       'shareFile': 'Fájl megosztása',
       'goToHome': 'Ugrás a főoldalra',
       'couldNotLoadImage': 'Nem sikerült betölteni a képet',
+      'passwordRequired': 'Jelszó szükséges',
+      'enterPassword': 'Adja meg a jelszót a PDF megnyitásához',
+      'invalidPassword': 'Érvénytelen jelszó. Kérjük, próbálja újra.',
+      'cancel': 'Mégse',
+      'open': 'Megnyitás',
     },
     'sv': {
       'openFile': 'Öppna fil',
@@ -296,6 +457,11 @@ class ExternalOpenScreenLanguage {
       'shareFile': 'Dela fil',
       'goToHome': 'Gå till Hem',
       'couldNotLoadImage': 'Kunde inte ladda bilden',
+      'passwordRequired': 'Lösenord krävs',
+      'enterPassword': 'Ange lösenord för att öppna denna PDF',
+      'invalidPassword': 'Ogiltigt lösenord. Försök igen.',
+      'cancel': 'Avbryt',
+      'open': 'Öppna',
     },
     'zh': {
       'openFile': '打开文件',
@@ -305,6 +471,11 @@ class ExternalOpenScreenLanguage {
       'shareFile': '分享文件',
       'goToHome': '回到首页',
       'couldNotLoadImage': '无法加载图片',
+      'passwordRequired': '需要密码',
+      'enterPassword': '输入密码以打开此 PDF',
+      'invalidPassword': '密码无效。请重试。',
+      'cancel': '取消',
+      'open': '打开',
     },
     'he': {
       'openFile': 'פתח קובץ',
@@ -314,6 +485,11 @@ class ExternalOpenScreenLanguage {
       'shareFile': 'שתף קובץ',
       'goToHome': 'עבור לדף הבית',
       'couldNotLoadImage': 'לא ניתן לטעון את התמונה',
+      'passwordRequired': 'נדרשת סיסמה',
+      'enterPassword': 'הזן סיסמה כדי לפתוح קובץ PDF זה',
+      'invalidPassword': 'סיסמה לא חוקית. אנא נסה שוב.',
+      'cancel': 'ביטול',
+      'open': 'פתח',
     },
     'da': {
       'openFile': 'Åbn fil',
@@ -323,6 +499,11 @@ class ExternalOpenScreenLanguage {
       'shareFile': 'Del fil',
       'goToHome': 'Gå til start',
       'couldNotLoadImage': 'Kunne ikke indlæse billedet',
+      'passwordRequired': 'Adgangskode påkrævet',
+      'enterPassword': 'Indtast adgangskode for at åbne denne PDF',
+      'invalidPassword': 'Ugyldig adgangskode. Prøv igen.',
+      'cancel': 'Annuller',
+      'open': 'Åbn',
     },
     'fi': {
       'openFile': 'Avaa tiedosto',
@@ -332,6 +513,11 @@ class ExternalOpenScreenLanguage {
       'shareFile': 'Jaa tiedosto',
       'goToHome': 'Etusivulle',
       'couldNotLoadImage': 'Kuvaa ei voitu ladata',
+      'passwordRequired': 'Salasana vaaditaan',
+      'enterPassword': 'Anna salasana avataksesi tämän PDF-tiedoston',
+      'invalidPassword': 'Virheellinen salasana. Yritä uudelleen.',
+      'cancel': 'Peruuta',
+      'open': 'Avaa',
     },
     'no': {
       'openFile': 'Åpne fil',
@@ -341,6 +527,11 @@ class ExternalOpenScreenLanguage {
       'shareFile': 'Del fil',
       'goToHome': 'Gå til Hjem',
       'couldNotLoadImage': 'Kunne ikke laste bildet',
+      'passwordRequired': 'Passord påkrevd',
+      'enterPassword': 'Skriv inn passord for å åpne denne PDF-en',
+      'invalidPassword': 'Ugyldig passord. Prøv igjen.',
+      'cancel': 'Avbryt',
+      'open': 'Åpne',
     },
     'sk': {
       'openFile': 'Otvoriť súbor',
@@ -350,6 +541,11 @@ class ExternalOpenScreenLanguage {
       'shareFile': 'Zdieľať súbor',
       'goToHome': 'Domov',
       'couldNotLoadImage': 'Obrázok sa nepodarilo načítať',
+      'passwordRequired': 'Vyžaduje sa heslo',
+      'enterPassword': 'Zadajte heslo na otvorenie tohto PDF',
+      'invalidPassword': 'Nesprávne heslo. Skúste to znova.',
+      'cancel': 'Zrušiť',
+      'open': 'Otvoriť',
     },
     'bg': {
       'openFile': 'Отваряне на файл',
@@ -359,6 +555,11 @@ class ExternalOpenScreenLanguage {
       'shareFile': 'Споделяне на файл',
       'goToHome': 'Към началната страница',
       'couldNotLoadImage': 'Изображението не може да бъде заредено',
+      'passwordRequired': 'Изисква се парола',
+      'enterPassword': 'Въведете парола, за да отворите този PDF',
+      'invalidPassword': 'Невалидна парола. Моля, опитайте отново.',
+      'cancel': 'Отказ',
+      'open': 'Отваряне',
     },
     'hr': {
       'openFile': 'Otvori datoteku',
@@ -368,6 +569,11 @@ class ExternalOpenScreenLanguage {
       'shareFile': 'Podijeli datoteku',
       'goToHome': 'Idi na početnu',
       'couldNotLoadImage': 'Slika se ne može učitati',
+      'passwordRequired': 'Potrebna lozinka',
+      'enterPassword': 'Unesite lozinku za otvaranje ovog PDF-a',
+      'invalidPassword': 'Neispravna lozinka. Pokušajte ponovno.',
+      'cancel': 'Odustani',
+      'open': 'Otvori',
     },
     'sr': {
       'openFile': 'Отвори датотеку',
@@ -377,6 +583,11 @@ class ExternalOpenScreenLanguage {
       'shareFile': 'Подели датотеку',
       'goToHome': 'Иди на почетну',
       'couldNotLoadImage': 'Слика се не може учитати',
+      'passwordRequired': 'Потребна лозинка',
+      'enterPassword': 'Унесите лозинку за отварање овог ПДФ-а',
+      'invalidPassword': 'Неважећа лозинка. Покушајте поново.',
+      'cancel': 'Откажи',
+      'open': 'Отвори',
     },
     'ca': {
       'openFile': 'Obrir fitxer',
@@ -386,16 +597,37 @@ class ExternalOpenScreenLanguage {
       'shareFile': 'Compartir fitxer',
       'goToHome': 'Anar a l\'Inici',
       'couldNotLoadImage': 'No s\'ha pogut carregar l\'imatge',
+      'passwordRequired': 'Contrasenya requerida',
+      'enterPassword': 'Introduïu la contrasenya per obrir aquest PDF',
+      'invalidPassword': 'Contrasenya no vàlida. Torneu-ho a provar.',
+      'cancel': 'Cancel·lar',
+      'open': 'Obrir',
     },
   };
 
-  static String getOpenFile(String languageCode) => getText(languageCode, 'openFile');
-  static String getFileNotFound(String languageCode) => getText(languageCode, 'fileNotFound');
-  static String getError(String languageCode, String error) => getText(languageCode, 'error').replaceFirst('{error}', error);
-  static String getOpenWithAnotherApp(String languageCode) => getText(languageCode, 'openWithAnotherApp');
-  static String getShareFile(String languageCode) => getText(languageCode, 'shareFile');
-  static String getGoToHome(String languageCode) => getText(languageCode, 'goToHome');
-  static String getCouldNotLoadImage(String languageCode) => getText(languageCode, 'couldNotLoadImage');
+  static String getOpenFile(String languageCode) =>
+      getText(languageCode, 'openFile');
+  static String getFileNotFound(String languageCode) =>
+      getText(languageCode, 'fileNotFound');
+  static String getError(String languageCode, String error) =>
+      getText(languageCode, 'error').replaceFirst('{error}', error);
+  static String getOpenWithAnotherApp(String languageCode) =>
+      getText(languageCode, 'openWithAnotherApp');
+  static String getShareFile(String languageCode) =>
+      getText(languageCode, 'shareFile');
+  static String getGoToHome(String languageCode) =>
+      getText(languageCode, 'goToHome');
+  static String getCouldNotLoadImage(String languageCode) =>
+      getText(languageCode, 'couldNotLoadImage');
+  static String getPasswordRequired(String languageCode) =>
+      getText(languageCode, 'passwordRequired');
+  static String getEnterPassword(String languageCode) =>
+      getText(languageCode, 'enterPassword');
+  static String getInvalidPassword(String languageCode) =>
+      getText(languageCode, 'invalidPassword');
+  static String getCancel(String languageCode) =>
+      getText(languageCode, 'cancel');
+  static String getOpen(String languageCode) => getText(languageCode, 'open');
 
   static String getText(String languageCode, String key) {
     return translations[languageCode]?[key] ?? translations['en']![key]!;

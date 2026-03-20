@@ -12,7 +12,7 @@ import '../services/gallery_save_service.dart';
 import '../services/multipleimagelogic.dart';
 import '../services/models.dart';
 import '../services/output_storage_service.dart';
-// import '../services/pdf_export_service.dart';
+import '../services/pdf_export_service.dart';
 
 List<int> _decodeImageSize(Uint8List bytes) {
   try {
@@ -72,6 +72,10 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
       const OutputStorageService();
   final GallerySaveService _gallerySaveService = const GallerySaveService();
   final AppSettings _settings = const AppSettings();
+
+  late final PdfExportService _pdfExportService = PdfExportService(
+    imageProcessingService: _imageProcessingService,
+  );
 
   static const MethodChannel _progressChannel = MethodChannel(
     'com.sholo.imageconverter/progress_notification',
@@ -540,6 +544,68 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
 
   Future<void> _saveActiveImage() async {
     final index = _activeIndex;
+    if (_images.isEmpty) return;
+
+    // In single-image mode, the user expects the Save button to actually save
+    // output to files/gallery. Multi-image flow still uses "Save All".
+    if (_images.length == 1) {
+      final baseStamp = _timestamp();
+      final effectiveFormat = _effectiveFormatForIndex(index);
+
+      if (effectiveFormat == OutputFormat.pdf) {
+        final options = _optionsForIndex(
+          index: index,
+          format: OutputFormat.pdf,
+        );
+        final pdfBytes = await _pdfExportService.buildPdf(
+          images: [_images[index]],
+          options: options,
+        );
+
+        final fileName = 'PDF_${baseStamp}_1.pdf';
+        await _outputStorageService.saveBytes(
+          fileName: fileName,
+          bytes: pdfBytes,
+        );
+      } else {
+        final options = _optionsForIndex(index: index, format: effectiveFormat);
+        final bytesToSave = await _encodeFinalImageBytes(
+          image: _images[index],
+          options: options,
+          canPreserveExif: options.keepExif && !_cropped,
+        );
+
+        final label = _formatLabel(effectiveFormat);
+        final ext = _formatExt(effectiveFormat);
+        final fileName = '${label}_${baseStamp}_1.$ext';
+
+        await _outputStorageService.saveBytes(
+          fileName: fileName,
+          bytes: bytesToSave,
+        );
+        unawaited(
+          _gallerySaveService.saveImage(bytes: bytesToSave, name: fileName),
+        );
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _savedIndices.add(index);
+        _saveDone = 1;
+        _saveTotal = 1;
+      });
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Saved successfully')));
+
+      Navigator.of(
+        context,
+      ).pushNamedAndRemoveUntil('/results', (route) => route.isFirst);
+      return;
+    }
+
+    // Multi-image: mark current as ready; actual saving happens via "Save All".
     setState(() {
       _savedIndices.add(index);
     });
@@ -549,8 +615,6 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
       return;
     }
 
-    // If it's the last image, we can just show a message or keep it as is
-    // as per user request to only save via "Save All"
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('All images marked as ready. Tap Save All to finish.'),

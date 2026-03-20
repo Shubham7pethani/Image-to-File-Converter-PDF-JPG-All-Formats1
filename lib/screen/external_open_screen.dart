@@ -32,6 +32,9 @@ class _ExternalOpenScreenState extends State<ExternalOpenScreen> {
   int _currentPage = 0;
   bool _isReady = false;
   String _errorMessage = '';
+  String? _password;
+  final TextEditingController _passwordController = TextEditingController();
+  bool _isPasswordDialogOpen = false;
 
   // Sidebar animation state
   bool _showSidebar = false;
@@ -50,6 +53,7 @@ class _ExternalOpenScreenState extends State<ExternalOpenScreen> {
   void dispose() {
     _sidebarTimer?.cancel();
     _sidebarScrollController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
@@ -89,6 +93,76 @@ class _ExternalOpenScreenState extends State<ExternalOpenScreen> {
   Future<void> _share() async {
     if (widget.path.isEmpty) return;
     await _brandedShareService.shareFile(filePath: widget.path);
+  }
+
+  Future<void> _showPasswordDialog({bool isRetry = false}) async {
+    if (_isPasswordDialogOpen) return;
+    _isPasswordDialogOpen = true;
+
+    final code = Localizations.localeOf(context).languageCode;
+    if (!isRetry) _passwordController.clear();
+
+    return showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: ExternalOpenScreen._card,
+          title: Text(
+            ExternalOpenScreenLanguage.getPasswordRequired(code),
+            style: const TextStyle(color: Colors.white),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: _passwordController,
+                obscureText: true,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  hintText: ExternalOpenScreenLanguage.getEnterPassword(code),
+                  hintStyle: const TextStyle(color: Colors.white54),
+                  errorText: isRetry
+                      ? ExternalOpenScreenLanguage.getInvalidPassword(code)
+                      : null,
+                  enabledBorder: const UnderlineInputBorder(
+                    borderSide: BorderSide(color: ExternalOpenScreen._gold),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                _isPasswordDialogOpen = false;
+                Navigator.pop(context);
+              },
+              child: Text(
+                ExternalOpenScreenLanguage.getCancel(code),
+                style: const TextStyle(color: Colors.white70),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                _isPasswordDialogOpen = false;
+                setState(() {
+                  _password = _passwordController.text;
+                  _errorMessage = '';
+                  _isReady = false; // Reset ready state to show loading again
+                });
+                Navigator.pop(context);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: ExternalOpenScreen._gold,
+                foregroundColor: Colors.black,
+              ),
+              child: Text(ExternalOpenScreenLanguage.getOpen(code)),
+            ),
+          ],
+        ),
+      ),
+    ).then((_) => _isPasswordDialogOpen = false);
   }
 
   Future<void> _openNative() async {
@@ -172,138 +246,163 @@ class _ExternalOpenScreenState extends State<ExternalOpenScreen> {
     }
 
     if (isPdf) {
-      return Stack(
-        children: [
-          PDFView(
-            filePath: path,
-            autoSpacing: true,
-            enableSwipe: true,
-            pageSnap: true,
-            swipeHorizontal: false,
-            nightMode: false,
-            onError: (error) {
-              setState(() {
-                _errorMessage = error.toString();
-              });
-            },
-            onRender: (pages) {
-              setState(() {
-                _totalPages = pages ?? 0;
-                _isReady = true;
-              });
-            },
-            onViewCreated: (controller) {
-              _pdfViewController = controller;
-            },
-            onPageChanged: (page, total) {
-              setState(() {
-                _currentPage = page ?? 0;
-              });
+      return KeyedSubtree(
+        key: ValueKey('pdf_view_${_password ?? 'none'}'),
+        child: Stack(
+          children: [
+            PDFView(
+              filePath: path,
+              password: _password,
+              autoSpacing: true,
+              enableSwipe: true,
+              pageSnap: true,
+              swipeHorizontal: false,
+              nightMode: false,
+              onError: (error) {
+                final errStr = error.toString();
+                debugPrint('PDF Error: $errStr');
+                // Common error strings for password failures in flutter_pdfview
+                if (errStr.contains('password') ||
+                    errStr.contains('Password') ||
+                    errStr.contains('1') ||
+                    errStr.contains('invalid') ||
+                    errStr.contains('wrong')) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    _showPasswordDialog(isRetry: _password != null);
+                  });
+                } else {
+                  setState(() {
+                    _errorMessage = errStr;
+                    _isReady = false;
+                  });
+                }
+              },
+              onRender: (pages) {
+                setState(() {
+                  _totalPages = pages ?? 0;
+                  _isReady = true;
+                  _errorMessage = ''; // Clear any previous error on success
+                });
+              },
+              onViewCreated: (controller) {
+                _pdfViewController = controller;
+              },
+              onPageChanged: (page, total) {
+                setState(() {
+                  _currentPage = page ?? 0;
+                });
 
-              _resetSidebarTimer();
+                _resetSidebarTimer();
 
-              // Auto-scroll sidebar to the current page
-              if (_sidebarScrollController.hasClients) {
-                _sidebarScrollController.animateTo(
-                  (_currentPage * 40.0).clamp(
-                    0.0,
-                    _sidebarScrollController.position.maxScrollExtent,
-                  ),
-                  duration: const Duration(milliseconds: 200),
-                  curve: Curves.easeInOut,
-                );
-              }
-            },
-            onPageError: (page, error) {
-              debugPrint('Page $page error: $error');
-            },
-          ),
-          if (!_isReady && _errorMessage.isEmpty)
-            const Center(
-              child: CircularProgressIndicator(color: ExternalOpenScreen._gold),
+                // Auto-scroll sidebar to the current page
+                if (_sidebarScrollController.hasClients) {
+                  _sidebarScrollController.animateTo(
+                    (_currentPage * 40.0).clamp(
+                      0.0,
+                      _sidebarScrollController.position.maxScrollExtent,
+                    ),
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeInOut,
+                  );
+                }
+              },
+              onPageError: (page, error) {
+                debugPrint('Page $page error: $error');
+              },
             ),
-          if (_errorMessage.isNotEmpty)
-            Center(
-              child: Text(
-                ExternalOpenScreenLanguage.getError(code, _errorMessage),
-                style: const TextStyle(color: Colors.redAccent),
-              ),
-            ),
-
-          // FAST SCROLL BAR ON THE RIGHT (WITH AUTO-HIDE ANIMATION)
-          if (_isReady && _totalPages > 1)
-            AnimatedPositioned(
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeOutCubic,
-              right: _showSidebar ? 8 : -60,
-              top: 40,
-              bottom: 80,
-              child: Container(
-                width: 44,
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.3),
-                  borderRadius: BorderRadius.circular(22),
+            if (!_isReady && _errorMessage.isEmpty)
+              const Center(
+                child: CircularProgressIndicator(
+                  color: ExternalOpenScreen._gold,
                 ),
-                child: ListView.builder(
-                  controller: _sidebarScrollController,
-                  itemCount: _totalPages,
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  itemBuilder: (context, index) {
-                    final isCurrent = index == _currentPage;
-                    return GestureDetector(
-                      onTap: () => _jumpToPage(index),
-                      child: Container(
-                        height: 34,
-                        margin: const EdgeInsets.symmetric(
-                          vertical: 3,
-                          horizontal: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isCurrent
-                              ? ExternalOpenScreen._gold
-                              : Colors.white.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(17),
-                        ),
-                        child: Center(
-                          child: Text(
-                            '${index + 1}',
-                            style: TextStyle(
-                              color: isCurrent ? Colors.black : Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
+              ),
+            if (_errorMessage.isNotEmpty)
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Text(
+                    ExternalOpenScreenLanguage.getError(code, _errorMessage),
+                    style: const TextStyle(color: Colors.redAccent),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+
+            // FAST SCROLL BAR ON THE RIGHT (WITH AUTO-HIDE ANIMATION)
+            if (_isReady && _totalPages > 1)
+              AnimatedPositioned(
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeOutCubic,
+                right: _showSidebar ? 8 : -60,
+                top: 40,
+                bottom: 80,
+                child: Container(
+                  width: 44,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(22),
+                  ),
+                  child: ListView.builder(
+                    controller: _sidebarScrollController,
+                    itemCount: _totalPages,
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    itemBuilder: (context, index) {
+                      final isCurrent = index == _currentPage;
+                      return GestureDetector(
+                        onTap: () => _jumpToPage(index),
+                        child: Container(
+                          height: 34,
+                          margin: const EdgeInsets.symmetric(
+                            vertical: 3,
+                            horizontal: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isCurrent
+                                ? ExternalOpenScreen._gold
+                                : Colors.white.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(17),
+                          ),
+                          child: Center(
+                            child: Text(
+                              '${index + 1}',
+                              style: TextStyle(
+                                color: isCurrent ? Colors.black : Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ),
-
-          if (_isReady && _totalPages > 0)
-            Positioned(
-              bottom: 20,
-              left: 20,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.7),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  '${_currentPage + 1} / $_totalPages',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
+                      );
+                    },
                   ),
                 ),
               ),
-            ),
-        ],
+
+            if (_isReady && _totalPages > 0)
+              Positioned(
+                bottom: 20,
+                left: 20,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.7),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '${_currentPage + 1} / $_totalPages',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
       );
     }
 
