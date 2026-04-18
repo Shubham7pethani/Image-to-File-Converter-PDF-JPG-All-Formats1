@@ -337,6 +337,71 @@ class MyAppState extends State<MyApp> {
 
 class GlobalAdController {
   static final ValueNotifier<bool> showAds = ValueNotifier<bool>(false);
+  static const String interstitialAdUnitId =
+      'ca-app-pub-3645213065759243/4231234137';
+}
+
+class InterstitialAdManager {
+  static InterstitialAd? _interstitialAd;
+  static bool _isAdLoading = false;
+
+  static void loadAd() {
+    if (_isAdLoading || _interstitialAd != null) return;
+    _isAdLoading = true;
+
+    InterstitialAd.load(
+      adUnitId: GlobalAdController.interstitialAdUnitId,
+      request: const AdRequest(),
+      adLoadCallback: InterstitialAdLoadCallback(
+        onAdLoaded: (ad) {
+          _interstitialAd = ad;
+          _isAdLoading = false;
+          debugPrint('Interstitial Ad Loaded');
+
+          ad.fullScreenContentCallback = FullScreenContentCallback(
+            onAdDismissedFullScreenContent: (ad) {
+              ad.dispose();
+              _interstitialAd = null;
+              loadAd(); // Preload next one
+            },
+            onAdFailedToShowFullScreenContent: (ad, error) {
+              ad.dispose();
+              _interstitialAd = null;
+              loadAd();
+            },
+          );
+        },
+        onAdFailedToLoad: (error) {
+          _isAdLoading = false;
+          _interstitialAd = null;
+          debugPrint('Interstitial Ad Failed to Load: ${error.message}');
+        },
+      ),
+    );
+  }
+
+  static void showAdIfReady(VoidCallback onAdFinished) {
+    if (_interstitialAd != null) {
+      _interstitialAd!.fullScreenContentCallback = FullScreenContentCallback(
+        onAdDismissedFullScreenContent: (ad) {
+          ad.dispose();
+          _interstitialAd = null;
+          onAdFinished();
+          loadAd(); // Preload next one
+        },
+        onAdFailedToShowFullScreenContent: (ad, error) {
+          ad.dispose();
+          _interstitialAd = null;
+          onAdFinished();
+          loadAd();
+        },
+      );
+      _interstitialAd!.show();
+    } else {
+      onAdFinished();
+      loadAd();
+    }
+  }
 }
 
 class _GlobalBannerScaffold extends StatefulWidget {

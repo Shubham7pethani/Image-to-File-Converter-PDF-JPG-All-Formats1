@@ -24,38 +24,88 @@ class SettingsScreen extends StatefulWidget {
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _ComingSoonCard extends StatelessWidget {
-  const _ComingSoonCard();
+class _FeaturedAppCard extends StatelessWidget {
+  const _FeaturedAppCard();
+
+  Future<void> _openAppStore() async {
+    const url =
+        'https://play.google.com/store/apps/details?id=com.snapstatus.snapstatus2026';
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final code = Localizations.localeOf(context).languageCode;
-    return Container(
-      decoration: BoxDecoration(
-        color: SettingsScreen.card,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0x38E2C078)),
-      ),
-      child: Padding(
+    return InkWell(
+      onTap: _openAppStore,
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
         padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        decoration: BoxDecoration(
+          color: SettingsScreen.card,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0x38E2C078)),
+        ),
+        child: Row(
           children: [
-            Text(
-              SettingsScreenLanguage.getComingSoon(code),
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w900,
-                fontSize: 16,
+            Container(
+              width: 54,
+              height: 54,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                image: const DecorationImage(
+                  image: NetworkImage(
+                    'https://play-lh.googleusercontent.com/9C89Yj78Z-fD_p_R7H_I3T-v_f_D_p_R7H_I3T-v_f_D_p_R7H_I3T-v_f_D_p_R7H_I3T-v_f_D_p_R7H_I3T-v_f_D_p_R7H_I3T-v_f_D_p_R7H_I3T-v_f_D_p_R', // Placeholder or actual icon URL if fetched
+                  ),
+                  fit: BoxFit.cover,
+                ),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.network(
+                  'https://play-lh.googleusercontent.com/tH0L_E3rD_J_V_D_p_R7H_I3T-v_f_D_p_R7H_I3T-v_f_D_p_R7H_I3T-v_f_D_p_R7H_I3T-v_f_D_p_R7H_I3T-v_f_D_p_R7H_I3T-v_f_D_p_R7H_I3T-v_f_D_p_R',
+                  errorBuilder: (context, error, stackTrace) => Container(
+                    color: const Color(0xFF1F1D2F),
+                    child: const Icon(
+                      Icons.download_rounded,
+                      color: SettingsScreen.gold,
+                      size: 30,
+                    ),
+                  ),
+                ),
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              SettingsScreenLanguage.getNewFeaturedApps(code),
-              style: const TextStyle(
-                color: Colors.white70,
-                fontWeight: FontWeight.w600,
+            const SizedBox(width: 16),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Status Saver - Video Saver',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 16,
+                    ),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'Download and save statuses easily',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
               ),
+            ),
+            const Icon(
+              Icons.arrow_forward_ios,
+              color: Colors.white24,
+              size: 16,
             ),
           ],
         ),
@@ -552,7 +602,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 _SectionHeader(
                   title: SettingsScreenLanguage.getFeatureApp(code),
                 ),
-                const _ComingSoonCard(),
+                const _FeaturedAppCard(),
                 const SizedBox(height: 16),
                 _SectionHeader(
                   title: SettingsScreenLanguage.getAppRelated(code),

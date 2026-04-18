@@ -2,8 +2,8 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_pdfview/flutter_pdfview.dart';
 import 'package:open_filex/open_filex.dart';
+import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 
 import '../language/external_open_screen_language.dart';
 import '../main.dart';
@@ -24,8 +24,14 @@ class ExternalOpenScreen extends StatefulWidget {
 
 class _ExternalOpenScreenState extends State<ExternalOpenScreen> {
   final BrandedShareService _brandedShareService = const BrandedShareService();
-  PDFViewController? _pdfViewController;
+  final PdfViewerController _pdfViewerController = PdfViewerController();
+  PdfTextSearchResult? _searchResult;
+  bool _showSearch = false;
+  final TextEditingController _searchController = TextEditingController();
   final ScrollController _sidebarScrollController = ScrollController();
+
+  Timer? _searchPollTimer;
+  int _searchPollGeneration = 0;
 
   // PDF state
   int _totalPages = 0;
@@ -40,6 +46,9 @@ class _ExternalOpenScreenState extends State<ExternalOpenScreen> {
   bool _showSidebar = false;
   Timer? _sidebarTimer;
 
+  bool _isSearching = false;
+  Timer? _debounceTimer;
+
   @override
   void initState() {
     super.initState();
@@ -47,14 +56,139 @@ class _ExternalOpenScreenState extends State<ExternalOpenScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       GlobalAdController.showAds.value = true;
     });
+
+    _searchController.addListener(_onSearchTextChanged);
+  }
+
+  void _onSearchTextChanged() {
+    if (!_showSearch) return;
+
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 500), () {
+      if (mounted && _showSearch) {
+        _runSearch(_searchController.text);
+      }
+    });
   }
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
     _sidebarTimer?.cancel();
+    _searchPollTimer?.cancel();
     _sidebarScrollController.dispose();
     _passwordController.dispose();
+    _searchResult?.removeListener(_onSearchResultChanged);
+    _searchController.dispose();
     super.dispose();
+  }
+
+  void _onSearchResultChanged() {
+    if (!mounted) return;
+    setState(() {});
+  }
+
+  void _toggleSearch() {
+    setState(() {
+      _showSearch = !_showSearch;
+      if (!_showSearch) {
+        _searchPollTimer?.cancel();
+        _searchPollTimer = null;
+        _searchController.clear();
+        _searchResult?.clear();
+        _searchResult = null;
+      }
+    });
+  }
+
+  void _showSnack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+  }
+
+  void _runSearch(String query) {
+    final q = query.trim();
+    if (q.isEmpty) {
+      setState(() {
+        _isSearching = false;
+        _searchPollTimer?.cancel();
+        _searchPollTimer = null;
+        _searchResult?.clear();
+        _searchResult = null;
+      });
+      return;
+    }
+
+    _searchResult?.removeListener(_onSearchResultChanged);
+    final result = _pdfViewerController.searchText(q);
+    result.addListener(_onSearchResultChanged);
+    setState(() {
+      _isSearching = true;
+      _searchResult = result;
+    });
+
+    _startSearchPolling(result, q);
+  }
+
+  void _startSearchPolling(PdfTextSearchResult result, String query) {
+    _searchPollTimer?.cancel();
+
+    final gen = ++_searchPollGeneration;
+    var elapsedMs = 0;
+
+    _searchPollTimer = Timer.periodic(const Duration(milliseconds: 150), (t) {
+      if (!mounted || gen != _searchPollGeneration) {
+        t.cancel();
+        return;
+      }
+
+      elapsedMs += 150;
+      final total = result.totalInstanceCount;
+
+      if (total > 0) {
+        t.cancel();
+        setState(() {
+          _isSearching = false;
+        });
+        _showSnack('Found $total results for "$query"');
+
+        // Auto-jump to first instance
+        if (result.currentInstanceIndex == 0) {
+          result.nextInstance();
+        }
+        return;
+      }
+
+      if (elapsedMs >= 2000) {
+        t.cancel();
+        setState(() {
+          _isSearching = false;
+        });
+        _showSnack('No results found for "$query"');
+      }
+    });
+  }
+
+  void _nextMatch() {
+    final r = _searchResult;
+    if (r == null) return;
+    if (r.totalInstanceCount <= 0) return;
+    r.nextInstance();
+  }
+
+  void _prevMatch() {
+    final r = _searchResult;
+    if (r == null) return;
+    if (r.totalInstanceCount <= 0) return;
+    r.previousInstance();
   }
 
   String _fileName(String p) {
@@ -171,7 +305,7 @@ class _ExternalOpenScreenState extends State<ExternalOpenScreen> {
   }
 
   void _jumpToPage(int page) {
-    _pdfViewController?.setPage(page);
+    _pdfViewerController.jumpToPage(page + 1);
 
     // Restart timer when user manually jumps to page
     _resetSidebarTimer();
@@ -206,11 +340,87 @@ class _ExternalOpenScreenState extends State<ExternalOpenScreen> {
         backgroundColor: ExternalOpenScreen._bg,
         foregroundColor: Colors.white,
         elevation: 0,
-        title: Text(
-          isPdf ? name : ExternalOpenScreenLanguage.getOpenFile(code),
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-        ),
+        bottom: _isSearching
+            ? const PreferredSize(
+                preferredSize: Size.fromHeight(2),
+                child: LinearProgressIndicator(
+                  backgroundColor: Colors.transparent,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    ExternalOpenScreen._gold,
+                  ),
+                  minHeight: 2,
+                ),
+              )
+            : null,
+        title: _showSearch && isPdf
+            ? TextField(
+                controller: _searchController,
+                autofocus: true,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                ),
+                decoration: const InputDecoration(
+                  hintText: 'Search in PDF',
+                  hintStyle: TextStyle(color: Colors.white54),
+                  border: InputBorder.none,
+                ),
+                textInputAction: TextInputAction.search,
+                onSubmitted: (val) => _runSearch(val),
+                onChanged: (val) {
+                  // Handled by listener
+                },
+              )
+            : Text(
+                isPdf ? name : ExternalOpenScreenLanguage.getOpenFile(code),
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
         actions: [
+          if (isPdf)
+            IconButton(
+              onPressed: _toggleSearch,
+              icon: Icon(_showSearch ? Icons.close : Icons.search),
+              color: ExternalOpenScreen._gold,
+            ),
+          if (isPdf && _showSearch)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              child: Center(
+                child: Text(
+                  () {
+                    final r = _searchResult;
+                    if (r == null) return '';
+                    final total = r.totalInstanceCount;
+                    if (total <= 0) return '0/0';
+                    final current = (r.currentInstanceIndex + 1).clamp(
+                      1,
+                      total,
+                    );
+                    return '$current/$total';
+                  }(),
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ),
+          if (isPdf && _showSearch)
+            IconButton(
+              onPressed: _prevMatch,
+              icon: const Icon(Icons.keyboard_arrow_up),
+              color: ExternalOpenScreen._gold,
+            ),
+          if (isPdf && _showSearch)
+            IconButton(
+              onPressed: _nextMatch,
+              icon: const Icon(Icons.keyboard_arrow_down),
+              color: ExternalOpenScreen._gold,
+            ),
           IconButton(
             onPressed: _share,
             icon: const Icon(Icons.share),
@@ -250,23 +460,17 @@ class _ExternalOpenScreenState extends State<ExternalOpenScreen> {
         key: ValueKey('pdf_view_${_password ?? 'none'}'),
         child: Stack(
           children: [
-            PDFView(
-              filePath: path,
+            SfPdfViewer.file(
+              File(path),
+              controller: _pdfViewerController,
               password: _password,
-              autoSpacing: true,
-              enableSwipe: true,
-              pageSnap: true,
-              swipeHorizontal: false,
-              nightMode: false,
-              onError: (error) {
-                final errStr = error.toString();
+              canShowScrollHead: false,
+              canShowScrollStatus: false,
+              onDocumentLoadFailed: (details) {
+                final errStr = details.error.toString();
                 debugPrint('PDF Error: $errStr');
-                // Common error strings for password failures in flutter_pdfview
-                if (errStr.contains('password') ||
-                    errStr.contains('Password') ||
-                    errStr.contains('1') ||
-                    errStr.contains('invalid') ||
-                    errStr.contains('wrong')) {
+                if (details.description.toLowerCase().contains('password') ||
+                    errStr.toLowerCase().contains('password')) {
                   WidgetsBinding.instance.addPostFrameCallback((_) {
                     _showPasswordDialog(isRetry: _password != null);
                   });
@@ -277,24 +481,21 @@ class _ExternalOpenScreenState extends State<ExternalOpenScreen> {
                   });
                 }
               },
-              onRender: (pages) {
+              onDocumentLoaded: (details) {
                 setState(() {
-                  _totalPages = pages ?? 0;
+                  _totalPages = details.document.pages.count;
+                  _currentPage = 0;
                   _isReady = true;
-                  _errorMessage = ''; // Clear any previous error on success
+                  _errorMessage = '';
                 });
               },
-              onViewCreated: (controller) {
-                _pdfViewController = controller;
-              },
-              onPageChanged: (page, total) {
+              onPageChanged: (details) {
                 setState(() {
-                  _currentPage = page ?? 0;
+                  _currentPage = (details.newPageNumber - 1).clamp(0, 1000000);
                 });
 
                 _resetSidebarTimer();
 
-                // Auto-scroll sidebar to the current page
                 if (_sidebarScrollController.hasClients) {
                   _sidebarScrollController.animateTo(
                     (_currentPage * 40.0).clamp(
@@ -305,9 +506,6 @@ class _ExternalOpenScreenState extends State<ExternalOpenScreen> {
                     curve: Curves.easeInOut,
                   );
                 }
-              },
-              onPageError: (page, error) {
-                debugPrint('Page $page error: $error');
               },
             ),
             if (!_isReady && _errorMessage.isEmpty)

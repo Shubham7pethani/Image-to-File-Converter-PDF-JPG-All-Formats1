@@ -310,10 +310,11 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     unawaited(_checkForShorebirdPatch());
 
-    // Preload native ads for different screens to avoid conflicts
+    // Preload ads
     NativeAdManager.preloadAd('home');
     NativeAdManager.preloadAd('choose');
     NativeAdManager.preloadAd('pdf');
+    InterstitialAdManager.loadAd();
 
     // Explicitly enable ads when the home screen is shown
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -412,7 +413,9 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: Icons.image_rounded,
             title: HomeScreenLanguage.getSingleImage(code),
             subtitle: HomeScreenLanguage.getSingleImageSubtitle(code),
-            onTap: () => Navigator.of(context).pushNamed('/single'),
+            onTap: () => InterstitialAdManager.showAdIfReady(
+              () => Navigator.of(context).pushNamed('/single'),
+            ),
           ),
           const SizedBox(height: 16),
           _FeatureCard(
@@ -420,7 +423,9 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: Icons.collections_rounded,
             title: HomeScreenLanguage.getMultipleImages(code),
             subtitle: HomeScreenLanguage.getMultipleImagesSubtitle(code),
-            onTap: () => Navigator.of(context).pushNamed('/multiple'),
+            onTap: () => InterstitialAdManager.showAdIfReady(
+              () => Navigator.of(context).pushNamed('/multiple'),
+            ),
           ),
           const SizedBox(height: 16),
           _FeatureCard(
@@ -428,7 +433,9 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: Icons.picture_as_pdf_rounded,
             title: HomeScreenLanguage.getCreatePdf(code),
             subtitle: HomeScreenLanguage.getCreatePdfSubtitle(code),
-            onTap: () => Navigator.of(context).pushNamed('/create-pdf'),
+            onTap: () => InterstitialAdManager.showAdIfReady(
+              () => Navigator.of(context).pushNamed('/create-pdf'),
+            ),
           ),
           const SizedBox(height: 16),
           _FeatureCard(
@@ -436,7 +443,9 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: Icons.folder_rounded,
             title: HomeScreenLanguage.getResultFolder(code),
             subtitle: HomeScreenLanguage.getResultFolderSubtitle(code),
-            onTap: () => Navigator.of(context).pushNamed('/results'),
+            onTap: () => InterstitialAdManager.showAdIfReady(
+              () => Navigator.of(context).pushNamed('/results'),
+            ),
           ),
           const SizedBox(height: 20),
           LayoutBuilder(
